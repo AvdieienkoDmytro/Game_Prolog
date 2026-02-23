@@ -6,293 +6,69 @@
 <title>K в ряд (падіння) — Prolog AI</title>
 <style>
   :root {
-    --navy:   #1a2744;
-    --teal:   #0d9488;
-    --teal2:  #14b8a6;
-    --bg:     #f0f4f8;
-    --white:  #ffffff;
-    --gray:   #64748b;
-    --graylt: #e2e8f0;
-    --x-col:  #0d9488;
-    --o-col:  #f59e0b;
-    --block:  #94a3b8;
-    --shadow: 0 4px 20px rgba(0,0,0,.15);
+    --navy:#1a2744; --teal:#0d9488; --teal2:#14b8a6;
+    --bg:#f0f4f8; --white:#ffffff; --gray:#64748b; --graylt:#e2e8f0;
+    --x-col:#0d9488; --o-col:#f59e0b; --shadow:0 4px 20px rgba(0,0,0,.15);
   }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    background: var(--bg);
-    color: #1e293b;
-    min-height: 100vh;
-  }
-
-  header {
-    background: var(--navy);
-    color: #fff;
-    padding: 14px 24px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 2px 12px rgba(0,0,0,.3);
-  }
-  header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: .5px; }
-  header span { font-size: .8rem; color: var(--teal2); }
-  .badge {
-    background: var(--teal);
-    color: #fff;
-    font-size: .7rem;
-    padding: 3px 8px;
-    border-radius: 99px;
-    font-weight: 600;
-    letter-spacing: .5px;
-  }
-
-  .layout {
-    display: flex;
-    gap: 20px;
-    padding: 20px;
-    max-width: 1100px;
-    margin: 0 auto;
-    align-items: flex-start;
-  }
-
-  /* ── LEFT PANEL ── */
-  .panel {
-    background: var(--white);
-    border-radius: 14px;
-    box-shadow: var(--shadow);
-    padding: 18px;
-  }
-  .panel h2 {
-    font-size: .85rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--teal);
-    margin-bottom: 14px;
-    border-bottom: 2px solid var(--graylt);
-    padding-bottom: 8px;
-  }
-
-  .settings { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
-
-  .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: .8rem; font-weight: 600; color: var(--gray); }
-  .field select, .field input[type=number] {
-    border: 1.5px solid var(--graylt);
-    border-radius: 8px;
-    padding: 7px 10px;
-    font-size: .9rem;
-    color: #1e293b;
-    background: #f8fafc;
-    outline: none;
-    transition: border-color .2s;
-  }
-  .field select:focus, .field input:focus { border-color: var(--teal); }
-
-  .btn {
-    width: 100%;
-    padding: 10px;
-    border: none;
-    border-radius: 9px;
-    font-size: .9rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all .2s;
-    letter-spacing: .3px;
-  }
-  .btn-primary { background: var(--teal); color: #fff; }
-  .btn-primary:hover { background: #0b7a71; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(13,148,136,.4); }
-  .btn-secondary { background: var(--graylt); color: #475569; }
-  .btn-secondary:hover { background: #cbd5e1; }
-  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
-
-  .forbidden-input {
-    width: 100%;
-    border: 1.5px solid var(--graylt);
-    border-radius: 8px;
-    padding: 7px 10px;
-    font-size: .8rem;
-    font-family: monospace;
-    color: #1e293b;
-    resize: vertical;
-    min-height: 60px;
-  }
-  .forbidden-input:focus { border-color: var(--teal); outline: none; }
-
-  /* ── STATUS ── */
-  .status-box {
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: .85rem;
-    font-weight: 600;
-    text-align: center;
-    transition: all .3s;
-  }
-  .status-wait   { background: #f0fdf4; color: #166534; border: 1.5px solid #bbf7d0; }
-  .status-ai     { background: #eff6ff; color: #1d4ed8; border: 1.5px solid #bfdbfe; }
-  .status-win    { background: #fef3c7; color: #92400e; border: 1.5px solid #fde68a; }
-  .status-draw   { background: #f1f5f9; color: #475569; border: 1.5px solid #cbd5e1; }
-  .status-error  { background: #fef2f2; color: #991b1b; border: 1.5px solid #fecaca; }
-  .status-load   { background: #f0fdf4; color: #166534; border: 1.5px solid #bbf7d0; }
-
-  /* ── LOG ── */
-  .log {
-    font-size: .75rem;
-    font-family: monospace;
-    color: var(--gray);
-    background: #f8fafc;
-    border-radius: 8px;
-    padding: 8px 10px;
-    max-height: 160px;
-    overflow-y: auto;
-    border: 1px solid var(--graylt);
-  }
-  .log p { line-height: 1.7; }
-  .log .log-x { color: var(--teal); }
-  .log .log-o { color: #d97706; }
-  .log .log-sys { color: #7c3aed; }
-
-  /* ── MAIN AREA ── */
-  .main { flex: 1; display: flex; flex-direction: column; gap: 16px; }
-
-  /* ── BOARD ── */
-  .board-wrap {
-    background: var(--white);
-    border-radius: 14px;
-    box-shadow: var(--shadow);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .col-arrows {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 6px;
-  }
-  .col-arrow {
-    width: 50px;
-    height: 28px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    border-radius: 6px;
-    font-size: 1.1rem;
-    transition: background .15s;
-    color: var(--teal);
-  }
-  .col-arrow:hover:not(:disabled) { background: #f0fdfa; }
-  .col-arrow:disabled { opacity: .3; cursor: not-allowed; }
-
-  #board-grid {
-    display: grid;
-    gap: 6px;
-    background: var(--navy);
-    padding: 10px;
-    border-radius: 12px;
-    box-shadow: inset 0 2px 8px rgba(0,0,0,.4);
-  }
-
-  .cell {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.3rem;
-    font-weight: 900;
-    transition: transform .15s, box-shadow .15s;
-    position: relative;
-  }
-  .cell-empty   { background: #e2e8f0; box-shadow: inset 0 3px 6px rgba(0,0,0,.2); }
-  .cell-blocked { background: #475569; box-shadow: inset 0 3px 6px rgba(0,0,0,.3); }
-  .cell-blocked::after { content: '✕'; font-size: .9rem; color: #94a3b8; }
-  .cell-x {
-    background: radial-gradient(circle at 35% 35%, #2dd4bf, var(--teal));
-    box-shadow: 0 4px 12px rgba(13,148,136,.5);
-  }
-  .cell-o {
-    background: radial-gradient(circle at 35% 35%, #fcd34d, var(--o-col));
-    box-shadow: 0 4px 12px rgba(245,158,11,.5);
-  }
-  .cell-x.winning, .cell-o.winning {
-    animation: pulse-win .6s ease-in-out infinite alternate;
-  }
-  @keyframes pulse-win {
-    from { transform: scale(1); }
-    to   { transform: scale(1.15); box-shadow: 0 0 20px rgba(255,255,255,.6); }
-  }
-  .cell-drop {
-    animation: drop .25s ease-out;
-  }
-  @keyframes drop {
-    from { transform: translateY(-40px); opacity: 0; }
-    to   { transform: translateY(0);     opacity: 1; }
-  }
-
-  /* ── SCORE ── */
-  .score-row {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
-  .score-card {
-    flex: 1;
-    background: var(--white);
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-    padding: 14px 18px;
-    text-align: center;
-  }
-  .score-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--gray); }
-  .score-name  { font-size .85rem; font-weight: 700; margin: 4px 0 2px; }
-  .score-num   { font-size: 2rem; font-weight: 900; line-height: 1; }
-  .score-x .score-num { color: var(--teal); }
-  .score-o .score-num { color: var(--o-col); }
-  .score-draw .score-num { color: var(--gray); }
-
-  /* ── PROLOG STATUS ── */
-  #prolog-status {
-    font-size: .75rem;
-    text-align: center;
-    color: var(--gray);
-    padding: 4px;
-  }
-  #prolog-status.ok   { color: var(--teal); }
-  #prolog-status.fail { color: #dc2626; }
-
-  /* ── LOADING OVERLAY ── */
-  #overlay {
-    position: fixed; inset: 0;
-    background: rgba(26,39,68,.85);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    z-index: 999;
-    gap: 16px;
-    color: #fff;
-  }
-  #overlay.hidden { display: none; }
-  .spinner {
-    width: 48px; height: 48px;
-    border: 5px solid rgba(255,255,255,.2);
-    border-top-color: var(--teal2);
-    border-radius: 50%;
-    animation: spin .8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── RESPONSIVE ── */
-  @media(max-width:760px) {
-    .layout { flex-direction: column; padding: 12px; }
-    .settings { width: 100%; }
-    .cell { width: 38px; height: 38px; font-size: 1rem; }
-    .col-arrow { width: 38px; }
-  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#1e293b;min-height:100vh}
+  header{background:var(--navy);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+  header h1{font-size:1.25rem;font-weight:700;letter-spacing:.5px}
+  header span{font-size:.8rem;color:var(--teal2)}
+  .badge{background:var(--teal);color:#fff;font-size:.7rem;padding:3px 8px;border-radius:99px;font-weight:600;letter-spacing:.5px}
+  .layout{display:flex;gap:20px;padding:20px;max-width:1100px;margin:0 auto;align-items:flex-start}
+  .panel{background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:18px}
+  .panel h2{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--teal);margin-bottom:14px;border-bottom:2px solid var(--graylt);padding-bottom:8px}
+  .settings{width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:16px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:.8rem;font-weight:600;color:var(--gray)}
+  .field select,.field input[type=number]{border:1.5px solid var(--graylt);border-radius:8px;padding:7px 10px;font-size:.9rem;background:#f8fafc;outline:none;transition:border-color .2s}
+  .field select:focus,.field input:focus{border-color:var(--teal)}
+  .btn{width:100%;padding:10px;border:none;border-radius:9px;font-size:.9rem;font-weight:700;cursor:pointer;transition:all .2s}
+  .btn-primary{background:var(--teal);color:#fff}
+  .btn-primary:hover{background:#0b7a71;transform:translateY(-1px);box-shadow:0 4px 12px rgba(13,148,136,.4)}
+  .btn-secondary{background:var(--graylt);color:#475569}
+  .btn-secondary:hover{background:#cbd5e1}
+  .btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+  .forbidden-input{width:100%;border:1.5px solid var(--graylt);border-radius:8px;padding:7px 10px;font-size:.8rem;font-family:monospace;resize:vertical;min-height:60px}
+  .forbidden-input:focus{border-color:var(--teal);outline:none}
+  .status-box{border-radius:10px;padding:10px 14px;font-size:.85rem;font-weight:600;text-align:center;transition:all .3s}
+  .status-wait{background:#f0fdf4;color:#166534;border:1.5px solid #bbf7d0}
+  .status-ai{background:#eff6ff;color:#1d4ed8;border:1.5px solid #bfdbfe}
+  .status-win{background:#fef3c7;color:#92400e;border:1.5px solid #fde68a}
+  .status-draw{background:#f1f5f9;color:#475569;border:1.5px solid #cbd5e1}
+  .status-error{background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca}
+  .log{font-size:.75rem;font-family:monospace;color:var(--gray);background:#f8fafc;border-radius:8px;padding:8px 10px;max-height:160px;overflow-y:auto;border:1px solid var(--graylt)}
+  .log p{line-height:1.7}
+  .log .log-x{color:var(--teal)}
+  .log .log-o{color:#d97706}
+  .log .log-sys{color:#7c3aed}
+  .main{flex:1;display:flex;flex-direction:column;gap:16px}
+  .board-wrap{background:var(--white);border-radius:14px;box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;align-items:center}
+  .col-arrows{display:flex;gap:6px;margin-bottom:6px}
+  .col-arrow{width:50px;height:28px;background:transparent;border:none;cursor:pointer;border-radius:6px;font-size:1.1rem;transition:background .15s;color:var(--teal)}
+  .col-arrow:hover:not(:disabled){background:#f0fdfa}
+  .col-arrow:disabled{opacity:.3;cursor:not-allowed}
+  #board-grid{display:grid;gap:6px;background:var(--navy);padding:10px;border-radius:12px;box-shadow:inset 0 2px 8px rgba(0,0,0,.4)}
+  .cell{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:900;transition:transform .15s}
+  .cell-empty{background:#e2e8f0;box-shadow:inset 0 3px 6px rgba(0,0,0,.2)}
+  .cell-blocked{background:#475569;box-shadow:inset 0 3px 6px rgba(0,0,0,.3);color:#94a3b8}
+  .cell-x{background:radial-gradient(circle at 35% 35%,#2dd4bf,var(--teal));box-shadow:0 4px 12px rgba(13,148,136,.5)}
+  .cell-o{background:radial-gradient(circle at 35% 35%,#fcd34d,var(--o-col));box-shadow:0 4px 12px rgba(245,158,11,.5)}
+  .cell-x.winning,.cell-o.winning{animation:pulse-win .6s ease-in-out infinite alternate}
+  @keyframes pulse-win{from{transform:scale(1)}to{transform:scale(1.15);box-shadow:0 0 20px rgba(255,255,255,.6)}}
+  .score-row{display:flex;gap:12px;justify-content:center}
+  .score-card{flex:1;background:var(--white);border-radius:12px;box-shadow:var(--shadow);padding:14px 18px;text-align:center}
+  .score-label{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--gray)}
+  .score-num{font-size:2rem;font-weight:900;line-height:1}
+  .score-x .score-num{color:var(--teal)}
+  .score-o .score-num{color:var(--o-col)}
+  .score-draw .score-num{color:var(--gray)}
+  #overlay{position:fixed;inset:0;background:rgba(26,39,68,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px;color:#fff}
+  #overlay.hidden{display:none}
+  .spinner{width:48px;height:48px;border:5px solid rgba(255,255,255,.2);border-top-color:var(--teal2);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media(max-width:760px){.layout{flex-direction:column;padding:12px}.settings{width:100%}.cell{width:38px;height:38px;font-size:1rem}.col-arrow{width:38px}}
 </style>
 </head>
 <body>
@@ -300,7 +76,7 @@
 <div id="overlay">
   <div class="spinner"></div>
   <div style="font-size:1.1rem;font-weight:700;">Завантаження Tau-Prolog...</div>
-  <div style="font-size:.85rem;color:#94a3b8;" id="load-detail">Ініціалізація інтерпретатора</div>
+  <div style="font-size:.85rem;color:#94a3b8;" id="load-detail">Ініціалізація</div>
 </div>
 
 <header>
@@ -312,16 +88,11 @@
 </header>
 
 <div class="layout">
-
-  <!-- ── SETTINGS ── -->
   <div class="settings">
-
     <div class="panel">
       <h2>Налаштування гри</h2>
-
       <div style="display:flex;flex-direction:column;gap:12px;">
-        <div class="field">
-          <label>Режим гри</label>
+        <div class="field"><label>Режим гри</label>
           <select id="mode">
             <option value="hh">Людина – Людина</option>
             <option value="hp" selected>Людина – Prolog</option>
@@ -329,451 +100,350 @@
             <option value="pp">Prolog – Prolog</option>
           </select>
         </div>
-
-        <div class="field">
-          <label>Рядки (n ≥ 5)</label>
+        <div class="field"><label>Рядки (n ≥ 5)</label>
           <input type="number" id="rows" value="6" min="5" max="12">
         </div>
-
-        <div class="field">
-          <label>Стовпці (m ≥ 6)</label>
+        <div class="field"><label>Стовпці (m ≥ 6)</label>
           <input type="number" id="cols" value="7" min="6" max="14">
         </div>
-
-        <div class="field">
-          <label>K — в ряд для виграшу [3..5]</label>
+        <div class="field"><label>K — в ряд [3..5]</label>
           <select id="kval">
             <option value="3">3</option>
             <option value="4" selected>4</option>
             <option value="5">5</option>
           </select>
         </div>
-
-        <div class="field">
-          <label>Складність ШІ (пів-ходи)</label>
+        <div class="field"><label>Складність ШІ (пів-ходи)</label>
           <select id="depth">
             <option value="2">Легко (2)</option>
             <option value="4" selected>Середньо (4)</option>
             <option value="6">Важко (6)</option>
           </select>
         </div>
-
-        <div class="field">
-          <label>Заборонені клітини (r,c)…</label>
+        <div class="field"><label>Заборонені клітини (r,c)...</label>
           <textarea class="forbidden-input" id="forbidden" placeholder="Напр: (3,4),(3,5)"></textarea>
         </div>
-
         <button class="btn btn-primary" id="btn-new">Нова гра</button>
         <button class="btn btn-secondary" id="btn-surrender" disabled>Здатися</button>
       </div>
     </div>
 
-    <!-- Score -->
     <div class="panel">
       <h2>Рахунок</h2>
       <div class="score-row">
-        <div class="score-card score-x">
-          <div class="score-label">X (Тіл)</div>
-          <div class="score-num" id="score-x">0</div>
-        </div>
-        <div class="score-card score-draw">
-          <div class="score-label">Нічия</div>
-          <div class="score-num" id="score-d">0</div>
-        </div>
-        <div class="score-card score-o">
-          <div class="score-label">O (Янт)</div>
-          <div class="score-num" id="score-o">0</div>
-        </div>
+        <div class="score-card score-x"><div class="score-label">X (Тіл)</div><div class="score-num" id="score-x">0</div></div>
+        <div class="score-card score-draw"><div class="score-label">Нічия</div><div class="score-num" id="score-d">0</div></div>
+        <div class="score-card score-o"><div class="score-label">O (Янт)</div><div class="score-num" id="score-o">0</div></div>
       </div>
     </div>
 
-    <!-- Log -->
     <div class="panel">
       <h2>Журнал</h2>
-      <div class="log" id="log"><p class="log-sys">Готово до гри.</p></div>
+      <div class="log" id="log"><p class="log-sys">Готово.</p></div>
     </div>
-
-    <div id="prolog-status">Tau-Prolog: завантаження...</div>
-
   </div>
 
-  <!-- ── MAIN ── -->
   <div class="main">
-
     <div class="board-wrap">
-      <div id="status" class="status-box status-load">Ініціалізація...</div>
+      <div id="status" class="status-box status-wait">Ініціалізація...</div>
       <div style="height:14px;"></div>
       <div class="col-arrows" id="col-arrows"></div>
       <div id="board-grid"></div>
     </div>
-
   </div>
 </div>
 
-<!-- Tau-Prolog from CDN -->
-<script src="https://cdn.jsdelivr.net/npm/tau-prolog@0.3.4/modules/core.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tau-prolog@0.3.4/modules/lists.js"></script>
-
+<script src="src/prolog/tau-prolog.js"></script>
+<script src="src/prolog/lists.js"></script>
 <script>
-// ============================================================
-// State
-// ============================================================
-const state = {
+// ── State ──────────────────────────────────────────────────
+const G = {
   session: null,
-  boardAtom: null,
-  rows: 6, cols: 7, k: 4,
-  currentPlayer: 'x',  // 'x' or 'o'
-  mode: 'hp',           // hh hp ph pp
-  depth: 4,
-  gameOver: false,
-  scores: { x:0, o:0, d:0 },
-  aiThinking: false,
-  winCells: [],
+  rows:6, cols:7, k:4,
+  currentPlayer:'x',
+  mode:'hp', depth:4,
+  gameOver:false,
+  scores:{x:0,o:0,d:0},
+  busy:false,
 };
 
-// ============================================================
-// Tau-Prolog helpers
-// ============================================================
-function prologQuery(query) {
+// ── Tau-Prolog helpers ──────────────────────────────────────
+function query(q) {
   return new Promise((resolve, reject) => {
-    state.session.query(query, {
-      success: () => {
-        state.session.answer({
-          success: ans => resolve(ans),
-          fail: ()  => resolve(null),
-          error: e  => reject(e),
-        });
-      },
-      error: e => reject(e),
+    G.session.query(q, {
+      success: () => G.session.answer({
+        success: ans => resolve(ans),
+        fail:    ()  => resolve(null),
+        error:   e   => reject(new Error(pl.format_answer(e))),
+      }),
+      error: e => reject(new Error(String(e))),
     });
   });
 }
 
-function termVal(ans, varName) {
-  if (!ans) return null;
-  const t = ans.lookup(varName);
+// Read a variable value from answer as JS string
+function val(ans, v) {
+  if (!ans || !ans.links) return null;
+  const t = ans.links[v];
   if (!t) return null;
-  return pl.format_answer({ lookup: () => t }) || t.toString();
+  // atom
+  if (t.id !== undefined) return String(t.id);
+  // number
+  if (t.value !== undefined) return t.value;
+  // compound - use format_answer on a fake substitution
+  return pl.format_answer({links:{X:t}}).replace('X = ','').trim();
 }
 
-// Strip outer quotes from atom strings returned by Tau-Prolog
-function stripQuotes(s) {
-  if (!s) return s;
-  s = s.trim();
-  if (s.startsWith("'") && s.endsWith("'")) return s.slice(1,-1).replace(/\\'/, "'");
-  return s;
+// Convert Tau-Prolog list term to JS array of atom strings
+function termListToArray(t) {
+  const arr = [];
+  while (t && t.id === '.' && t.args) {
+    const head = t.args[0];
+    arr.push(head.id !== undefined ? String(head.id) : String(head.value));
+    t = t.args[1];
+  }
+  return arr;
 }
 
-// ============================================================
-// Load Prolog program
-// ============================================================
+// ── Init ───────────────────────────────────────────────────
 async function initProlog() {
-  setLoadDetail('Створення сесії...');
-  state.session = pl.create(500000);
+  setDetail('Створення сесії...');
+  G.session = pl.create(1000000);
 
+  setDetail('Завантаження kinariad_tau.pl...');
   const resp = await fetch('src/prolog/kinariad_tau.pl');
   if (!resp.ok) throw new Error('Cannot load kinariad_tau.pl: ' + resp.status);
   const src = await resp.text();
 
-  setLoadDetail('Компіляція Prolog...');
-  await new Promise((resolve, reject) => {
-    state.session.consult(src, { success: resolve, error: reject });
-  });
-
-  document.getElementById('prolog-status').textContent = 'Tau-Prolog: завантажено';
-  document.getElementById('prolog-status').className = 'ok';
-  setLoadDetail('Готово!');
+  setDetail('Компіляція...');
+  await new Promise((res, rej) => G.session.consult(src, {success:res, error:rej}));
+  setDetail('Готово!');
 }
 
-// ============================================================
-// Game logic
-// ============================================================
+// ── New game ───────────────────────────────────────────────
 async function newGame() {
-  const rows = Math.max(5, parseInt(document.getElementById('rows').value) || 6);
-  const cols = Math.max(6, parseInt(document.getElementById('cols').value) || 7);
-  const k    = parseInt(document.getElementById('kval').value) || 4;
-  const mode = document.getElementById('mode').value;
-  const depth= parseInt(document.getElementById('depth').value) || 4;
-
-  // Parse forbidden cells
-  const forbText = document.getElementById('forbidden').value.trim();
-  let forbAtom = '[]';
-  if (forbText) {
-    forbAtom = '[' + forbText.replace(/\s/g,'') + ']';
-  }
-
-  state.rows = rows; state.cols = cols; state.k = k;
-  state.mode = mode; state.depth = depth;
-  state.currentPlayer = 'x';
-  state.gameOver = false;
-  state.winCells = [];
-  state.aiThinking = false;
+  G.rows    = Math.max(5, parseInt(document.getElementById('rows').value)||6);
+  G.cols    = Math.max(6, parseInt(document.getElementById('cols').value)||7);
+  G.k       = parseInt(document.getElementById('kval').value)||4;
+  G.mode    = document.getElementById('mode').value;
+  G.depth   = parseInt(document.getElementById('depth').value)||4;
+  G.currentPlayer = 'x';
+  G.gameOver = false;
+  G.busy = false;
 
   document.getElementById('btn-surrender').disabled = false;
 
-  logMsg('sys', `Нова гра ${rows}×${cols} k=${k} режим=${mode} глибина=${depth}`);
+  // Build forbidden list
+  const forbText = document.getElementById('forbidden').value.trim();
+  const forbProlog = forbText ? '[' + forbText.replace(/\s/g,'') + ']' : '[]';
 
   try {
-    const ans = await prologQuery(
-      `js_new_game(${rows}, ${cols}, ${k}, ${forbAtom}, BoardAtom)`
-    );
-    if (!ans) throw new Error('js_new_game failed');
-    state.boardAtom = stripQuotes(termVal(ans, 'BoardAtom'));
-    renderBoard();
-    setStatus('wait');
-    updateStatusText();
+    // Set forbidden and init board in Prolog DB
+    await query(`js_set_forbidden(${forbProlog})`);
+    const ans = await query(`js_init(${G.rows}, ${G.cols}, ${G.k})`);
+    if (!ans) throw new Error('js_init failed');
 
-    // If Prolog goes first
-    if (shouldAiMove()) {
-      setTimeout(doAiMove, 400);
-    }
+    logMsg('sys', `Нова гра ${G.rows}x${G.cols} k=${G.k} режим=${G.mode}`);
+    await renderBoard();
+    updateStatus();
+
+    if (isAI()) setTimeout(doAI, 400);
   } catch(e) {
-    setStatus('error', 'Помилка: ' + e);
-    log('error', e.toString());
+    setStatus('error', 'Помилка: ' + e.message);
+    logMsg('sys', e.message);
     console.error(e);
   }
 }
 
-function shouldAiMove() {
-  const { mode, currentPlayer } = state;
-  if (mode === 'pp') return true;
-  if (mode === 'ph' && currentPlayer === 'x') return true;
-  if (mode === 'hp' && currentPlayer === 'o') return true;
-  return false;
-}
-
-async function humanClickCol(col) {
-  if (state.gameOver || state.aiThinking) return;
-  if (shouldAiMove()) return; // not human's turn
-
-  const player = state.currentPlayer;
-  try {
-    const ans = await prologQuery(
-      `js_human_move('${state.boardAtom}', ${col}, ${player}, NewBoard, Result)`
-    );
-    if (!ans) { logMsg('sys', `Стовпець ${col} заповнений`); return; }
-
-    const result = stripQuotes(termVal(ans, 'Result'));
-    state.boardAtom = stripQuotes(termVal(ans, 'NewBoard'));
-
-    logMsg(player, `${player.toUpperCase()} → стовпець ${col}`);
-    renderBoard();
-    await handleResult(result, player);
-  } catch(e) {
-    setStatus('error', 'Помилка: ' + e);
-    console.error(e);
-  }
-}
-
-async function doAiMove() {
-  if (state.gameOver) return;
-  state.aiThinking = true;
-  setStatus('ai', `ШІ (${state.currentPlayer.toUpperCase()}) думає...`);
+// ── Human move ─────────────────────────────────────────────
+async function humanClick(col) {
+  if (G.gameOver || G.busy || isAI()) return;
+  G.busy = true;
   disableArrows(true);
 
-  const player = state.currentPlayer;
-  // Small delay to let UI update
+  try {
+    const ans = await query(`js_human(${col}, ${G.currentPlayer}, Row, Result)`);
+    if (!ans) { logMsg('sys', `Стовпець ${col} заповнений`); return; }
+
+    const result = String(val(ans, 'Result'));
+    logMsg(G.currentPlayer, `${G.currentPlayer.toUpperCase()} -> стовпець ${col}`);
+    await renderBoard();
+    await handleResult(result);
+  } catch(e) {
+    setStatus('error', e.message);
+    console.error(e);
+  } finally {
+    G.busy = false;
+    if (!G.gameOver) disableArrows(false);
+  }
+}
+
+// ── AI move ────────────────────────────────────────────────
+async function doAI() {
+  if (G.gameOver) return;
+  G.busy = true;
+  disableArrows(true);
+  setStatus('ai', `ШІ (${G.currentPlayer.toUpperCase()}) думає...`);
+
   await new Promise(r => setTimeout(r, 30));
 
   try {
-    const ans = await prologQuery(
-      `js_ai_move('${state.boardAtom}', ${player}, ${state.depth}, NewBoard, Col, Result)`
+    const ans = await query(
+      `js_ai(${G.currentPlayer}, ${G.depth}, ColOut, RowOut, Result)`
     );
     if (!ans) { setStatus('error', 'ШІ не знайшов хід'); return; }
 
-    const col    = parseInt(termVal(ans, 'Col'));
-    const result = stripQuotes(termVal(ans, 'Result'));
-    state.boardAtom = stripQuotes(termVal(ans, 'NewBoard'));
-
-    logMsg(player, `${player.toUpperCase()} (ШІ) → стовпець ${col}`);
-    renderBoard();
-    await handleResult(result, player);
+    const col    = val(ans, 'ColOut');
+    const result = String(val(ans, 'Result'));
+    logMsg(G.currentPlayer, `${G.currentPlayer.toUpperCase()} (ШІ) -> стовпець ${col}`);
+    await renderBoard();
+    await handleResult(result);
   } catch(e) {
-    setStatus('error', 'Помилка ШІ: ' + e);
+    setStatus('error', 'Помилка ШІ: ' + e.message);
     console.error(e);
   } finally {
-    state.aiThinking = false;
-    if (!state.gameOver) disableArrows(false);
+    G.busy = false;
+    if (!G.gameOver) disableArrows(isAI());
   }
 }
 
-async function handleResult(result, player) {
+// ── Handle result ──────────────────────────────────────────
+async function handleResult(result) {
   if (result === 'win') {
-    state.gameOver = true;
-    state.scores[player]++;
+    G.gameOver = true;
+    G.scores[G.currentPlayer]++;
     updateScores();
-    setStatus('win', `${player.toUpperCase()} перемагає!`);
-    logMsg(player, `${player.toUpperCase()} переміг!`);
-    highlightWinCells(player);
+    setStatus('win', `${G.currentPlayer.toUpperCase()} перемагає!`);
+    logMsg(G.currentPlayer, `${G.currentPlayer.toUpperCase()} переміг!`);
+    highlightWinner(G.currentPlayer);
     document.getElementById('btn-surrender').disabled = true;
   } else if (result === 'draw') {
-    state.gameOver = true;
-    state.scores.d++;
+    G.gameOver = true;
+    G.scores.d++;
     updateScores();
     setStatus('draw', 'Нічия!');
-    logMsg('sys', 'Нічия — поле заповнене');
+    logMsg('sys', 'Нічия');
     document.getElementById('btn-surrender').disabled = true;
   } else {
-    // Switch player
-    state.currentPlayer = player === 'x' ? 'o' : 'x';
-    updateStatusText();
-    if (shouldAiMove()) {
-      setTimeout(doAiMove, state.mode === 'pp' ? 300 : 200);
-    }
+    G.currentPlayer = G.currentPlayer === 'x' ? 'o' : 'x';
+    updateStatus();
+    if (isAI()) setTimeout(doAI, G.mode === 'pp' ? 300 : 200);
   }
 }
 
-// ============================================================
-// Board rendering
-// ============================================================
+// ── Render board ───────────────────────────────────────────
 async function renderBoard() {
-  const grid = document.getElementById('board-grid');
+  const ans = await query('js_get_board(Rows, Cols, K, Cells)');
+  if (!ans || !ans.links) return;
+
+  const rows  = val(ans, 'Rows');
+  const cols  = val(ans, 'Cols');
+  const cells = termListToArray(ans.links['Cells']);
+
+  const grid   = document.getElementById('board-grid');
   const arrows = document.getElementById('col-arrows');
 
-  // Get cells and board info from Prolog
-  const ansC = await prologQuery(`js_get_cells('${state.boardAtom}', CellsAtom)`);
-  if (!ansC) return;
-  const cellsStr = stripQuotes(termVal(ansC, 'CellsAtom'));
-
-  // Parse cells list: e/x/o/b
-  const cells = parsePrologList(cellsStr);
-
-  const { rows, cols } = state;
-
-  // Build grid
   grid.style.gridTemplateColumns = `repeat(${cols}, 50px)`;
   grid.innerHTML = '';
 
-  cells.forEach((val, idx) => {
-    const r = Math.floor(idx / cols) + 1;
-    const c = (idx % cols) + 1;
+  cells.forEach((v, idx) => {
     const div = document.createElement('div');
     div.className = 'cell';
-    if      (val === 'x') div.classList.add('cell-x');
-    else if (val === 'o') div.classList.add('cell-o');
-    else if (val === 'b') div.classList.add('cell-blocked');
-    else                  div.classList.add('cell-empty');
-    div.dataset.r = r;
+    if      (v === 'x') div.classList.add('cell-x');
+    else if (v === 'o') div.classList.add('cell-o');
+    else if (v === 'b') { div.classList.add('cell-blocked'); div.textContent = '✕'; }
+    else                div.classList.add('cell-empty');
+    const c = (idx % parseInt(cols)) + 1;
     div.dataset.c = c;
     grid.appendChild(div);
   });
 
-  // Rebuild arrows
+  // Arrows
   arrows.innerHTML = '';
-  for (let c = 1; c <= cols; c++) {
+  for (let c = 1; c <= parseInt(cols); c++) {
     const btn = document.createElement('button');
     btn.className = 'col-arrow';
     btn.textContent = '▼';
     btn.title = `Стовпець ${c}`;
     btn.dataset.col = c;
-    btn.disabled = state.gameOver || state.aiThinking || shouldAiMove();
-    btn.addEventListener('click', () => humanClickCol(parseInt(btn.dataset.col)));
+    btn.addEventListener('click', () => humanClick(parseInt(btn.dataset.col)));
     arrows.appendChild(btn);
   }
+  disableArrows(G.gameOver || G.busy || isAI());
 }
 
-function parsePrologList(str) {
-  // Input: "[e,x,o,b,...]" — extract atoms
-  if (!str) return [];
-  const inner = str.replace(/^\[/, '').replace(/\]$/, '');
-  if (!inner.trim()) return [];
-  return inner.split(',').map(s => s.trim());
+function highlightWinner(player) {
+  document.querySelectorAll('.cell-' + player)
+    .forEach(el => el.classList.add('winning'));
 }
 
-function disableArrows(disabled) {
-  document.querySelectorAll('.col-arrow').forEach(b => b.disabled = disabled);
+// ── Helpers ────────────────────────────────────────────────
+function isAI() {
+  const {mode, currentPlayer} = G;
+  return mode === 'pp' ||
+    (mode === 'ph' && currentPlayer === 'x') ||
+    (mode === 'hp' && currentPlayer === 'o');
 }
 
-// ============================================================
-// Win highlighting
-// ============================================================
-async function highlightWinCells(player) {
-  // Re-parse board to find winning cells
-  const { rows, cols, boardAtom } = state;
-  for (let r = 1; r <= rows; r++) {
-    for (let c = 1; c <= cols; c++) {
-      try {
-        const ans = await prologQuery(
-          `js_human_move('${boardAtom}', 1, x, _, _)` // dummy — just need cell check
-        );
-      } catch(e) {}
-    }
-  }
-  // Simple: flash all cells of winning player
-  document.querySelectorAll('.cell-' + player).forEach(el => {
-    el.classList.add('winning');
-  });
-}
-
-// ============================================================
-// Status & UI helpers
-// ============================================================
 function setStatus(type, msg) {
   const el = document.getElementById('status');
   el.className = 'status-box status-' + type;
   if (msg) el.textContent = msg;
 }
 
-function updateStatusText() {
-  const { currentPlayer, mode } = state;
-  const isAi = shouldAiMove();
-  const who = currentPlayer.toUpperCase();
-  if (isAi) {
-    setStatus('ai', `Хід ${who} — ШІ (Prolog)`);
-  } else {
-    setStatus('wait', `Хід ${who} — натисни ▼ над стовпцем`);
-  }
+function updateStatus() {
+  if (isAI()) setStatus('ai', `Хід ${G.currentPlayer.toUpperCase()} — ШІ (Prolog)`);
+  else        setStatus('wait', `Хід ${G.currentPlayer.toUpperCase()} — натисни ▼`);
 }
 
 function updateScores() {
-  document.getElementById('score-x').textContent = state.scores.x;
-  document.getElementById('score-o').textContent = state.scores.o;
-  document.getElementById('score-d').textContent = state.scores.d;
+  document.getElementById('score-x').textContent = G.scores.x;
+  document.getElementById('score-o').textContent = G.scores.o;
+  document.getElementById('score-d').textContent = G.scores.d;
 }
 
 function logMsg(type, msg) {
   const log = document.getElementById('log');
   const p = document.createElement('p');
-  p.className = type === 'x' ? 'log-x' : type === 'o' ? 'log-o' : 'log-sys';
+  p.className = type==='x' ? 'log-x' : type==='o' ? 'log-o' : 'log-sys';
   p.textContent = msg;
   log.appendChild(p);
   log.scrollTop = log.scrollHeight;
 }
 
-function setLoadDetail(msg) {
+function disableArrows(d) {
+  document.querySelectorAll('.col-arrow').forEach(b => b.disabled = d);
+}
+
+function setDetail(msg) {
   const el = document.getElementById('load-detail');
   if (el) el.textContent = msg;
 }
 
 function surrender() {
-  if (state.gameOver) return;
-  const loser = state.currentPlayer;
-  const winner = loser === 'x' ? 'o' : 'x';
-  state.gameOver = true;
-  state.scores[winner]++;
+  if (G.gameOver) return;
+  const winner = G.currentPlayer === 'x' ? 'o' : 'x';
+  G.gameOver = true;
+  G.scores[winner]++;
   updateScores();
-  setStatus('win', `${winner.toUpperCase()} виграє — ${loser.toUpperCase()} здався`);
-  logMsg('sys', `${loser.toUpperCase()} здався`);
+  setStatus('win', `${winner.toUpperCase()} виграє — ${G.currentPlayer.toUpperCase()} здався`);
+  logMsg('sys', `${G.currentPlayer.toUpperCase()} здався`);
   document.getElementById('btn-surrender').disabled = true;
   disableArrows(true);
 }
 
-// ============================================================
-// Event listeners
-// ============================================================
+// ── Events ─────────────────────────────────────────────────
 document.getElementById('btn-new').addEventListener('click', newGame);
 document.getElementById('btn-surrender').addEventListener('click', surrender);
 
-// ============================================================
-// Init
-// ============================================================
-(async function() {
+// ── Bootstrap ──────────────────────────────────────────────
+(async () => {
   try {
     await initProlog();
     document.getElementById('overlay').classList.add('hidden');
     await newGame();
   } catch(e) {
-    document.getElementById('load-detail').textContent = 'ПОМИЛКА: ' + e;
+    setDetail('ПОМИЛКА: ' + e.message);
     document.getElementById('load-detail').style.color = '#f87171';
     console.error(e);
   }

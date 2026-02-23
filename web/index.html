@@ -471,7 +471,7 @@ async function initProlog() {
   setLoadDetail('Створення сесії...');
   state.session = pl.create(500000);
 
-  const resp = await fetch('src/prolog/kinariad_tau.pl');
+  const resp = await fetch('../src/prolog/kinariad_tau.pl');
   if (!resp.ok) throw new Error('Cannot load kinariad_tau.pl: ' + resp.status);
   const src = await resp.text();
 
