@@ -411,8 +411,8 @@
 </div>
 
 <!-- Tau-Prolog from CDN -->
-<script src="https://tau-prolog.org/modules/js/tau-prolog.js"></script>
-<script src="https://tau-prolog.org/modules/js/lists.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tau-prolog@0.3.4/modules/core.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tau-prolog@0.3.4/modules/lists.js"></script>
 
 <script>
 // ============================================================
@@ -471,7 +471,7 @@ async function initProlog() {
   setLoadDetail('Створення сесії...');
   state.session = pl.create(500000);
 
-  const resp = await fetch('../src/prolog/kinariad_tau.pl');
+  const resp = await fetch('src/prolog/kinariad_tau.pl');
   if (!resp.ok) throw new Error('Cannot load kinariad_tau.pl: ' + resp.status);
   const src = await resp.text();
 
