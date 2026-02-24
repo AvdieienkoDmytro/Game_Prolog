@@ -7,6 +7,7 @@
 % JS must call assertz(current_board(none)) once after consult to register it.
 
 :- use_module(library(lists)).
+:- dynamic current_board/1.
 
 % Sentinel - makes current_board/1 known to the DB so retractall won't throw.
 % JS init code replaces this immediately via retractall+assertz.
