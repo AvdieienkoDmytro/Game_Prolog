@@ -410,8 +410,9 @@ const state = {
 // Tau-Prolog: single-answer query
 // ============================================================
 function prologQuery(query) {
+  const q = query.trimEnd().endsWith('.') ? query : query + '.';
   return new Promise((resolve, reject) => {
-    state.session.query(query, {
+    state.session.query(q, {
       success: () => {
         state.session.answer({
           success: ans => resolve(ans),
