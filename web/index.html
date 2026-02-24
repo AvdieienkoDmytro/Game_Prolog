@@ -15,7 +15,6 @@
     --graylt: #e2e8f0;
     --x-col:  #0d9488;
     --o-col:  #f59e0b;
-    --block:  #94a3b8;
     --shadow: 0 4px 20px rgba(0,0,0,.15);
   }
 
@@ -58,7 +57,6 @@
     align-items: flex-start;
   }
 
-  /* ── LEFT PANEL ── */
   .panel {
     background: var(--white);
     border-radius: 14px;
@@ -122,7 +120,6 @@
   }
   .forbidden-input:focus { border-color: var(--teal); outline: none; }
 
-  /* ── STATUS ── */
   .status-box {
     border-radius: 10px;
     padding: 10px 14px;
@@ -138,7 +135,6 @@
   .status-error  { background: #fef2f2; color: #991b1b; border: 1.5px solid #fecaca; }
   .status-load   { background: #f0fdf4; color: #166534; border: 1.5px solid #bbf7d0; }
 
-  /* ── LOG ── */
   .log {
     font-size: .75rem;
     font-family: monospace;
@@ -151,14 +147,12 @@
     border: 1px solid var(--graylt);
   }
   .log p { line-height: 1.7; }
-  .log .log-x { color: var(--teal); }
-  .log .log-o { color: #d97706; }
+  .log .log-x   { color: var(--teal); }
+  .log .log-o   { color: #d97706; }
   .log .log-sys { color: #7c3aed; }
 
-  /* ── MAIN AREA ── */
   .main { flex: 1; display: flex; flex-direction: column; gap: 16px; }
 
-  /* ── BOARD ── */
   .board-wrap {
     background: var(--white);
     border-radius: 14px;
@@ -169,14 +163,9 @@
     align-items: center;
   }
 
-  .col-arrows {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 6px;
-  }
+  .col-arrows { display: flex; gap: 6px; margin-bottom: 6px; }
   .col-arrow {
-    width: 50px;
-    height: 28px;
+    width: 50px; height: 28px;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -198,8 +187,7 @@
   }
 
   .cell {
-    width: 50px;
-    height: 50px;
+    width: 50px; height: 50px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -211,7 +199,7 @@
   }
   .cell-empty   { background: #e2e8f0; box-shadow: inset 0 3px 6px rgba(0,0,0,.2); }
   .cell-blocked { background: #475569; box-shadow: inset 0 3px 6px rgba(0,0,0,.3); }
-  .cell-blocked::after { content: '✕'; font-size: .9rem; color: #94a3b8; }
+  .cell-blocked::after { content: '\2715'; font-size: .9rem; color: #94a3b8; }
   .cell-x {
     background: radial-gradient(circle at 35% 35%, #2dd4bf, var(--teal));
     box-shadow: 0 4px 12px rgba(13,148,136,.5);
@@ -227,20 +215,13 @@
     from { transform: scale(1); }
     to   { transform: scale(1.15); box-shadow: 0 0 20px rgba(255,255,255,.6); }
   }
-  .cell-drop {
-    animation: drop .25s ease-out;
-  }
+  .cell-drop { animation: drop .25s ease-out; }
   @keyframes drop {
     from { transform: translateY(-40px); opacity: 0; }
     to   { transform: translateY(0);     opacity: 1; }
   }
 
-  /* ── SCORE ── */
-  .score-row {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
+  .score-row { display: flex; gap: 12px; justify-content: center; }
   .score-card {
     flex: 1;
     background: var(--white);
@@ -250,13 +231,12 @@
     text-align: center;
   }
   .score-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--gray); }
-  .score-name  { font-size .85rem; font-weight: 700; margin: 4px 0 2px; }
+  .score-name  { font-size: .85rem; font-weight: 700; margin: 4px 0 2px; }
   .score-num   { font-size: 2rem; font-weight: 900; line-height: 1; }
-  .score-x .score-num { color: var(--teal); }
-  .score-o .score-num { color: var(--o-col); }
+  .score-x .score-num    { color: var(--teal); }
+  .score-o .score-num    { color: var(--o-col); }
   .score-draw .score-num { color: var(--gray); }
 
-  /* ── PROLOG STATUS ── */
   #prolog-status {
     font-size: .75rem;
     text-align: center;
@@ -266,7 +246,6 @@
   #prolog-status.ok   { color: var(--teal); }
   #prolog-status.fail { color: #dc2626; }
 
-  /* ── LOADING OVERLAY ── */
   #overlay {
     position: fixed; inset: 0;
     background: rgba(26,39,68,.85);
@@ -286,7 +265,6 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── RESPONSIVE ── */
   @media(max-width:760px) {
     .layout { flex-direction: column; padding: 12px; }
     .settings { width: 100%; }
@@ -313,13 +291,12 @@
 
 <div class="layout">
 
-  <!-- ── SETTINGS ── -->
+  <!-- SETTINGS -->
   <div class="settings">
-
     <div class="panel">
       <h2>Налаштування гри</h2>
-
       <div style="display:flex;flex-direction:column;gap:12px;">
+
         <div class="field">
           <label>Режим гри</label>
           <select id="mode">
@@ -352,9 +329,10 @@
         <div class="field">
           <label>Складність ШІ (пів-ходи)</label>
           <select id="depth">
-            <option value="2">Легко (2)</option>
-            <option value="4" selected>Середньо (4)</option>
-            <option value="6">Важко (6)</option>
+            <option value="2">Легко (2) ~&lt;1с</option>
+            <option value="3" selected>Нормально (3) ~1с</option>
+            <option value="4">Середньо (4) ~3с</option>
+            <option value="6">Важко (6) ~15с</option>
           </select>
         </div>
 
@@ -394,19 +372,16 @@
     </div>
 
     <div id="prolog-status">Tau-Prolog: завантаження...</div>
-
   </div>
 
-  <!-- ── MAIN ── -->
+  <!-- MAIN -->
   <div class="main">
-
     <div class="board-wrap">
       <div id="status" class="status-box status-load">Ініціалізація...</div>
       <div style="height:14px;"></div>
       <div class="col-arrows" id="col-arrows"></div>
       <div id="board-grid"></div>
     </div>
-
   </div>
 </div>
 
@@ -420,19 +395,19 @@
 // ============================================================
 const state = {
   session: null,
-  boardAtom: null,
   rows: 6, cols: 7, k: 4,
-  currentPlayer: 'x',  // 'x' or 'o'
-  mode: 'hp',           // hh hp ph pp
-  depth: 4,
+  currentPlayer: 'x',
+  mode: 'hp',
+  depth: 3,
   gameOver: false,
-  scores: { x:0, o:0, d:0 },
+  scores: { x: 0, o: 0, d: 0 },
   aiThinking: false,
-  winCells: [],
+  // Local JS copy of board cells for fast rendering (no extra Prolog call)
+  cellsCache: null,
 };
 
 // ============================================================
-// Tau-Prolog helpers
+// Tau-Prolog: single-answer query
 // ============================================================
 function prologQuery(query) {
   return new Promise((resolve, reject) => {
@@ -440,8 +415,8 @@ function prologQuery(query) {
       success: () => {
         state.session.answer({
           success: ans => resolve(ans),
-          fail: ()  => resolve(null),
-          error: e  => reject(e),
+          fail:    ()  => resolve(null),
+          error:   e   => reject(e),
         });
       },
       error: e => reject(e),
@@ -449,19 +424,15 @@ function prologQuery(query) {
   });
 }
 
+// Extract variable binding as a plain JS string
 function termVal(ans, varName) {
   if (!ans) return null;
   const t = ans.lookup(varName);
   if (!t) return null;
-  return pl.format_answer({ lookup: () => t }) || t.toString();
-}
-
-// Strip outer quotes from atom strings returned by Tau-Prolog
-function stripQuotes(s) {
-  if (!s) return s;
-  s = s.trim();
-  if (s.startsWith("'") && s.endsWith("'")) return s.slice(1,-1).replace(/\\'/, "'");
-  return s;
+  // format_answer gives "Var = value"; we want just the value string
+  const full = pl.format_answer(ans) || '';
+  // Try direct toString on the term
+  return t.toString();
 }
 
 // ============================================================
@@ -469,11 +440,17 @@ function stripQuotes(s) {
 // ============================================================
 async function initProlog() {
   setLoadDetail('Створення сесії...');
-  state.session = pl.create(500000);
+  state.session = pl.create(1000000);
 
-  const resp = await fetch('../src/prolog/kinariad_tau.pl');
-  if (!resp.ok) throw new Error('Cannot load kinariad_tau.pl: ' + resp.status);
-  const src = await resp.text();
+  // Try relative path first (works with local server), then same-dir fallback
+  let src = null;
+  for (const path of ['../src/prolog/kinariad_tau.pl', 'kinariad_tau.pl']) {
+    try {
+      const resp = await fetch(path);
+      if (resp.ok) { src = await resp.text(); break; }
+    } catch(_) {}
+  }
+  if (!src) throw new Error('Cannot load kinariad_tau.pl');
 
   setLoadDetail('Компіляція Prolog...');
   await new Promise((resolve, reject) => {
@@ -486,52 +463,89 @@ async function initProlog() {
 }
 
 // ============================================================
-// Game logic
+// Prolog <-> JS bridge
+// Uses the assert-based API: js_set_forbidden, js_init, js_human, js_ai, js_get_board
 // ============================================================
-async function newGame() {
-  const rows = Math.max(5, parseInt(document.getElementById('rows').value) || 6);
-  const cols = Math.max(6, parseInt(document.getElementById('cols').value) || 7);
-  const k    = parseInt(document.getElementById('kval').value) || 4;
-  const mode = document.getElementById('mode').value;
-  const depth= parseInt(document.getElementById('depth').value) || 4;
 
-  // Parse forbidden cells
+// Parse forbidden string "(r,c),(r,c)" → Prolog list atom "[(r,c),(r,c)]"
+function parseForbidden(text) {
+  const cleaned = text.replace(/\s/g, '');
+  if (!cleaned) return '[]';
+  // Validate basic format
+  const matches = cleaned.match(/\(\d+,\d+\)/g);
+  if (!matches) return '[]';
+  return '[' + matches.join(',') + ']';
+}
+
+async function newGame() {
+  const rows  = Math.max(5,  parseInt(document.getElementById('rows').value)  || 6);
+  const cols  = Math.max(6,  parseInt(document.getElementById('cols').value)  || 7);
+  const k     =              parseInt(document.getElementById('kval').value)  || 4;
+  const mode  = document.getElementById('mode').value;
+  const depth = parseInt(document.getElementById('depth').value) || 3;
   const forbText = document.getElementById('forbidden').value.trim();
-  let forbAtom = '[]';
-  if (forbText) {
-    forbAtom = '[' + forbText.replace(/\s/g,'') + ']';
-  }
+  const forbAtom = parseForbidden(forbText);
 
   state.rows = rows; state.cols = cols; state.k = k;
   state.mode = mode; state.depth = depth;
   state.currentPlayer = 'x';
   state.gameOver = false;
-  state.winCells = [];
   state.aiThinking = false;
+  state.cellsCache = null;
 
   document.getElementById('btn-surrender').disabled = false;
-
   logMsg('sys', `Нова гра ${rows}×${cols} k=${k} режим=${mode} глибина=${depth}`);
 
   try {
-    const ans = await prologQuery(
-      `js_new_game(${rows}, ${cols}, ${k}, ${forbAtom}, BoardAtom)`
-    );
-    if (!ans) throw new Error('js_new_game failed');
-    state.boardAtom = stripQuotes(termVal(ans, 'BoardAtom'));
-    renderBoard();
+    // 1. Set forbidden list in Prolog DB
+    await prologQuery(`js_set_forbidden(${forbAtom})`);
+
+    // 2. Init game
+    const initAns = await prologQuery(`js_init(${rows}, ${cols}, ${k})`);
+    if (!initAns) throw new Error('js_init failed');
+
+    // 3. Fetch board for rendering
+    await fetchAndRender();
     setStatus('wait');
     updateStatusText();
 
-    // If Prolog goes first
     if (shouldAiMove()) {
       setTimeout(doAiMove, 400);
     }
   } catch(e) {
     setStatus('error', 'Помилка: ' + e);
-    log('error', e.toString());
+    logMsg('sys', 'ERROR: ' + e);
     console.error(e);
   }
+}
+
+// Fetch board state from Prolog and render
+async function fetchAndRender() {
+  const ans = await prologQuery('js_get_board(Rows, Cols, K, Cells)');
+  if (!ans) return;
+
+  // Parse Rows/Cols from answer
+  const rowsT = ans.lookup('Rows');
+  const colsT = ans.lookup('Cols');
+  const cellsT = ans.lookup('Cells');
+
+  if (rowsT) state.rows = parseInt(rowsT.toString());
+  if (colsT) state.cols = parseInt(colsT.toString());
+
+  // Parse cell list from Prolog term
+  state.cellsCache = parsePrologListTerm(cellsT);
+  renderBoardFromCache();
+}
+
+// Parse Tau-Prolog list term to JS array of strings
+function parsePrologListTerm(term) {
+  const result = [];
+  let cur = term;
+  while (cur && cur.indicator === './2') {
+    result.push(cur.args[0].toString());
+    cur = cur.args[1];
+  }
+  return result;
 }
 
 function shouldAiMove() {
@@ -544,20 +558,29 @@ function shouldAiMove() {
 
 async function humanClickCol(col) {
   if (state.gameOver || state.aiThinking) return;
-  if (shouldAiMove()) return; // not human's turn
+  if (shouldAiMove()) return;
 
   const player = state.currentPlayer;
   try {
     const ans = await prologQuery(
-      `js_human_move('${state.boardAtom}', ${col}, ${player}, NewBoard, Result)`
+      `js_human(${col}, ${player}, RowOut, Result)`
     );
-    if (!ans) { logMsg('sys', `Стовпець ${col} заповнений`); return; }
+    if (!ans) {
+      logMsg('sys', `Стовпець ${col} — немає відповіді`);
+      return;
+    }
 
-    const result = stripQuotes(termVal(ans, 'Result'));
-    state.boardAtom = stripQuotes(termVal(ans, 'NewBoard'));
+    const result = ans.lookup('Result').toString();
+    const rowOut = parseInt(ans.lookup('RowOut').toString());
 
-    logMsg(player, `${player.toUpperCase()} → стовпець ${col}`);
-    renderBoard();
+    if (result === 'full') {
+      logMsg('sys', `Стовпець ${col} заповнений`);
+      return;
+    }
+
+    logMsg(player, `${player.toUpperCase()} → стовпець ${col} (рядок ${rowOut})`);
+    await fetchAndRender();
+    animateLastDrop(rowOut - 1, col - 1);
     await handleResult(result, player);
   } catch(e) {
     setStatus('error', 'Помилка: ' + e);
@@ -572,21 +595,36 @@ async function doAiMove() {
   disableArrows(true);
 
   const player = state.currentPlayer;
-  // Small delay to let UI update
-  await new Promise(r => setTimeout(r, 30));
+
+  // Yield to browser for UI repaint before heavy Prolog computation
+  await new Promise(r => setTimeout(r, 50));
 
   try {
     const ans = await prologQuery(
-      `js_ai_move('${state.boardAtom}', ${player}, ${state.depth}, NewBoard, Col, Result)`
+      `js_ai(${player}, ${state.depth}, ColOut, RowOut, Result)`
     );
-    if (!ans) { setStatus('error', 'ШІ не знайшов хід'); return; }
+    if (!ans) {
+      setStatus('error', 'ШІ не знайшов хід');
+      return;
+    }
 
-    const col    = parseInt(termVal(ans, 'Col'));
-    const result = stripQuotes(termVal(ans, 'Result'));
-    state.boardAtom = stripQuotes(termVal(ans, 'NewBoard'));
+    const result = ans.lookup('Result').toString();
+    const col    = parseInt(ans.lookup('ColOut').toString());
+    const row    = parseInt(ans.lookup('RowOut').toString());
 
-    logMsg(player, `${player.toUpperCase()} (ШІ) → стовпець ${col}`);
-    renderBoard();
+    if (result === 'draw' && col === -1) {
+      state.gameOver = true;
+      state.scores.d++;
+      updateScores();
+      setStatus('draw', 'Нічия!');
+      logMsg('sys', 'Нічия — поле заповнене');
+      document.getElementById('btn-surrender').disabled = true;
+      return;
+    }
+
+    logMsg(player, `${player.toUpperCase()} (ШІ) → стовпець ${col} (рядок ${row})`);
+    await fetchAndRender();
+    animateLastDrop(row - 1, col - 1);
     await handleResult(result, player);
   } catch(e) {
     setStatus('error', 'Помилка ШІ: ' + e);
@@ -606,6 +644,7 @@ async function handleResult(result, player) {
     logMsg(player, `${player.toUpperCase()} переміг!`);
     highlightWinCells(player);
     document.getElementById('btn-surrender').disabled = true;
+    disableArrows(true);
   } else if (result === 'draw') {
     state.gameOver = true;
     state.scores.d++;
@@ -613,48 +652,40 @@ async function handleResult(result, player) {
     setStatus('draw', 'Нічия!');
     logMsg('sys', 'Нічия — поле заповнене');
     document.getElementById('btn-surrender').disabled = true;
+    disableArrows(true);
   } else {
-    // Switch player
+    // result === 'ok'
     state.currentPlayer = player === 'x' ? 'o' : 'x';
     updateStatusText();
     if (shouldAiMove()) {
       setTimeout(doAiMove, state.mode === 'pp' ? 300 : 200);
+    } else {
+      disableArrows(false);
     }
   }
 }
 
 // ============================================================
-// Board rendering
+// Board rendering (uses cellsCache — no extra Prolog call)
 // ============================================================
-async function renderBoard() {
-  const grid = document.getElementById('board-grid');
+function renderBoardFromCache() {
+  const grid   = document.getElementById('board-grid');
   const arrows = document.getElementById('col-arrows');
+  const { rows, cols, cellsCache } = state;
 
-  // Get cells and board info from Prolog
-  const ansC = await prologQuery(`js_get_cells('${state.boardAtom}', CellsAtom)`);
-  if (!ansC) return;
-  const cellsStr = stripQuotes(termVal(ansC, 'CellsAtom'));
+  if (!cellsCache) return;
 
-  // Parse cells list: e/x/o/b
-  const cells = parsePrologList(cellsStr);
-
-  const { rows, cols } = state;
-
-  // Build grid
   grid.style.gridTemplateColumns = `repeat(${cols}, 50px)`;
   grid.innerHTML = '';
 
-  cells.forEach((val, idx) => {
-    const r = Math.floor(idx / cols) + 1;
-    const c = (idx % cols) + 1;
+  cellsCache.forEach((val, idx) => {
     const div = document.createElement('div');
     div.className = 'cell';
     if      (val === 'x') div.classList.add('cell-x');
     else if (val === 'o') div.classList.add('cell-o');
     else if (val === 'b') div.classList.add('cell-blocked');
     else                  div.classList.add('cell-empty');
-    div.dataset.r = r;
-    div.dataset.c = c;
+    div.dataset.idx = idx;
     grid.appendChild(div);
   });
 
@@ -663,7 +694,7 @@ async function renderBoard() {
   for (let c = 1; c <= cols; c++) {
     const btn = document.createElement('button');
     btn.className = 'col-arrow';
-    btn.textContent = '▼';
+    btn.textContent = '\u25BC';
     btn.title = `Стовпець ${c}`;
     btn.dataset.col = c;
     btn.disabled = state.gameOver || state.aiThinking || shouldAiMove();
@@ -672,12 +703,16 @@ async function renderBoard() {
   }
 }
 
-function parsePrologList(str) {
-  // Input: "[e,x,o,b,...]" — extract atoms
-  if (!str) return [];
-  const inner = str.replace(/^\[/, '').replace(/\]$/, '');
-  if (!inner.trim()) return [];
-  return inner.split(',').map(s => s.trim());
+// Add drop animation to the cell at (rowIdx, colIdx) (0-based)
+function animateLastDrop(rowIdx, colIdx) {
+  const { cols } = state;
+  const idx = rowIdx * cols + colIdx;
+  const cells = document.querySelectorAll('#board-grid .cell');
+  if (cells[idx]) {
+    cells[idx].classList.remove('cell-drop');
+    void cells[idx].offsetWidth; // reflow
+    cells[idx].classList.add('cell-drop');
+  }
 }
 
 function disableArrows(disabled) {
@@ -687,19 +722,7 @@ function disableArrows(disabled) {
 // ============================================================
 // Win highlighting
 // ============================================================
-async function highlightWinCells(player) {
-  // Re-parse board to find winning cells
-  const { rows, cols, boardAtom } = state;
-  for (let r = 1; r <= rows; r++) {
-    for (let c = 1; c <= cols; c++) {
-      try {
-        const ans = await prologQuery(
-          `js_human_move('${boardAtom}', 1, x, _, _)` // dummy — just need cell check
-        );
-      } catch(e) {}
-    }
-  }
-  // Simple: flash all cells of winning player
+function highlightWinCells(player) {
   document.querySelectorAll('.cell-' + player).forEach(el => {
     el.classList.add('winning');
   });
@@ -715,13 +738,13 @@ function setStatus(type, msg) {
 }
 
 function updateStatusText() {
-  const { currentPlayer, mode } = state;
+  const { currentPlayer } = state;
   const isAi = shouldAiMove();
   const who = currentPlayer.toUpperCase();
   if (isAi) {
     setStatus('ai', `Хід ${who} — ШІ (Prolog)`);
   } else {
-    setStatus('wait', `Хід ${who} — натисни ▼ над стовпцем`);
+    setStatus('wait', `Хід ${who} — натисни \u25BC над стовпцем`);
   }
 }
 
@@ -747,7 +770,7 @@ function setLoadDetail(msg) {
 
 function surrender() {
   if (state.gameOver) return;
-  const loser = state.currentPlayer;
+  const loser  = state.currentPlayer;
   const winner = loser === 'x' ? 'o' : 'x';
   state.gameOver = true;
   state.scores[winner]++;

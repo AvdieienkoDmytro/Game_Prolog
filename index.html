@@ -115,9 +115,10 @@
         </div>
         <div class="field"><label>Складність ШІ (пів-ходи)</label>
           <select id="depth">
-            <option value="2">Легко (2)</option>
-            <option value="4" selected>Середньо (4)</option>
-            <option value="6">Важко (6)</option>
+            <option value="2">Легко (2) ~&lt;1с</option>
+            <option value="3" selected>Нормально (3) ~1с</option>
+            <option value="4">Середньо (4) ~3с</option>
+            <option value="6">Важко (6) ~15с</option>
           </select>
         </div>
         <div class="field"><label>Заборонені клітини (r,c)...</label>
@@ -161,7 +162,7 @@ const G = {
   session: null,
   rows:6, cols:7, k:4,
   currentPlayer:'x',
-  mode:'hp', depth:4,
+  mode:'hp', depth:3,
   gameOver:false,
   scores:{x:0,o:0,d:0},
   busy:false,
@@ -285,7 +286,7 @@ async function doAI() {
   disableArrows(true);
   setStatus('ai', `ШІ (${G.currentPlayer.toUpperCase()}) думає...`);
 
-  await new Promise(r => setTimeout(r, 30));
+  await new Promise(r => setTimeout(r, 50));
 
   try {
     const ans = await query(
