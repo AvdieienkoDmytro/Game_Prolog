@@ -387,7 +387,6 @@
 
 <!-- Tau-Prolog from CDN -->
 <script src="https://cdn.jsdelivr.net/npm/tau-prolog@0.3.4/modules/core.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tau-prolog@0.3.4/modules/lists.js"></script>
 
 <script>
 // ============================================================
@@ -402,8 +401,7 @@ const state = {
   gameOver: false,
   scores: { x: 0, o: 0, d: 0 },
   aiThinking: false,
-  // Local JS copy of board cells for fast rendering (no extra Prolog call)
-  cellsCache: null,
+  board: '',  // flat string rows*cols chars: e/x/o/b
 };
 
 // ============================================================
@@ -465,52 +463,50 @@ async function initProlog() {
 }
 
 // ============================================================
-// Prolog <-> JS bridge
-// Uses the assert-based API: js_set_forbidden, js_init, js_human, js_ai, js_get_board
+// Prolog bridge - stateless API
 // ============================================================
 
-// Parse forbidden string "(r,c),(r,c)" → Prolog list atom "[(r,c),(r,c)]"
 function parseForbidden(text) {
   const cleaned = text.replace(/\s/g, '');
   if (!cleaned) return '[]';
-  // Validate basic format
   const matches = cleaned.match(/\(\d+,\d+\)/g);
   if (!matches) return '[]';
   return '[' + matches.join(',') + ']';
 }
 
+function shouldAiMove() {
+  const { mode, currentPlayer } = state;
+  return mode === 'pp' ||
+    (mode === 'ph' && currentPlayer === 'x') ||
+    (mode === 'hp' && currentPlayer === 'o');
+}
+
 async function newGame() {
-  const rows  = Math.max(5,  parseInt(document.getElementById('rows').value)  || 6);
-  const cols  = Math.max(6,  parseInt(document.getElementById('cols').value)  || 7);
-  const k     =              parseInt(document.getElementById('kval').value)  || 4;
+  const rows  = Math.max(5, parseInt(document.getElementById('rows').value) || 6);
+  const cols  = Math.max(6, parseInt(document.getElementById('cols').value) || 7);
+  const k     = parseInt(document.getElementById('kval').value) || 4;
   const mode  = document.getElementById('mode').value;
   const depth = parseInt(document.getElementById('depth').value) || 3;
-  const forbText = document.getElementById('forbidden').value.trim();
-  const forbAtom = parseForbidden(forbText);
+  const forbAtom = parseForbidden(document.getElementById('forbidden').value.trim());
 
   state.rows = rows; state.cols = cols; state.k = k;
   state.mode = mode; state.depth = depth;
   state.currentPlayer = 'x';
   state.gameOver = false;
   state.aiThinking = false;
-  state.cellsCache = null;
 
   document.getElementById('btn-surrender').disabled = false;
   logMsg('sys', `Нова гра ${rows}×${cols} k=${k} режим=${mode} глибина=${depth}`);
 
   try {
-    // Init game (forbidden list passed directly)
-    const initAns = await prologQuery(`js_init(${rows}, ${cols}, ${k}, ${forbAtom})`);
-    if (!initAns) throw new Error('js_init failed');
+    const ans = await prologQuery(`js_new_board(${rows},${cols},${forbAtom},BoardAtom)`);
+    if (!ans) throw new Error('js_new_board failed');
+    state.board = ans.lookup('BoardAtom').toString();
 
-    // 3. Fetch board for rendering
-    await fetchAndRender();
+    renderBoard();
     setStatus('wait');
     updateStatusText();
-
-    if (shouldAiMove()) {
-      setTimeout(doAiMove, 400);
-    }
+    if (shouldAiMove()) setTimeout(doAiMove, 400);
   } catch(e) {
     setStatus('error', 'Помилка: ' + e);
     logMsg('sys', 'ERROR: ' + e);
@@ -518,76 +514,24 @@ async function newGame() {
   }
 }
 
-// Fetch board state from Prolog and render
-async function fetchAndRender() {
-  const ans = await prologQuery('js_get_board(Rows, Cols, K, Cells)');
-  if (!ans) return;
-
-  // Parse Rows/Cols from answer
-  const rowsT = ans.lookup('Rows');
-  const colsT = ans.lookup('Cols');
-  const cellsT = ans.lookup('Cells');
-
-  if (rowsT) state.rows = parseInt(rowsT.toString());
-  if (colsT) state.cols = parseInt(colsT.toString());
-
-  // Parse cell list from Prolog term
-  state.cellsCache = parsePrologListTerm(cellsT);
-  renderBoardFromCache();
-}
-
-// Parse Tau-Prolog list term (possibly list-of-lists) to flat JS array of strings
-function parsePrologListTerm(term) {
-  const result = [];
-  // flatWalk: iterate a Prolog list, push atoms, recurse into sub-lists
-  function flatWalk(node) {
-    while (node && node.indicator === './2') {
-      const head = node.args[0];
-      if (head.indicator === './2' || head.indicator === '[]/0') {
-        // head is a sub-list (a row) - flatten it too
-        flatWalk(head);
-      } else {
-        result.push(head.toString());
-      }
-      node = node.args[1];
-    }
-  }
-  flatWalk(term);
-  return result;
-}
-
-function shouldAiMove() {
-  const { mode, currentPlayer } = state;
-  if (mode === 'pp') return true;
-  if (mode === 'ph' && currentPlayer === 'x') return true;
-  if (mode === 'hp' && currentPlayer === 'o') return true;
-  return false;
-}
-
 async function humanClickCol(col) {
-  if (state.gameOver || state.aiThinking) return;
-  if (shouldAiMove()) return;
+  if (state.gameOver || state.aiThinking || shouldAiMove()) return;
 
   const player = state.currentPlayer;
   try {
     const ans = await prologQuery(
-      `js_human(${col}, ${player}, RowOut, Result)`
+      `js_human('${state.board}',${col},${player},${state.rows},${state.cols},${state.k},RowOut,NewBoard,Result)`
     );
-    if (!ans) {
-      logMsg('sys', `Стовпець ${col} — немає відповіді`);
-      return;
-    }
+    if (!ans) { logMsg('sys', `Стовпець ${col} — немає відповіді`); return; }
 
     const result = ans.lookup('Result').toString();
     const rowOut = parseInt(ans.lookup('RowOut').toString());
 
-    if (result === 'full') {
-      logMsg('sys', `Стовпець ${col} заповнений`);
-      return;
-    }
+    if (result === 'full') { logMsg('sys', `Стовпець ${col} заповнений`); return; }
 
+    state.board = ans.lookup('NewBoard').toString();
     logMsg(player, `${player.toUpperCase()} → стовпець ${col} (рядок ${rowOut})`);
-    await fetchAndRender();
+    renderBoard();
     animateLastDrop(rowOut - 1, col - 1);
     await handleResult(result, player);
   } catch(e) {
@@ -603,35 +547,21 @@ async function doAiMove() {
   disableArrows(true);
 
   const player = state.currentPlayer;
-
-  // Yield to browser for UI repaint before heavy Prolog computation
   await new Promise(r => setTimeout(r, 50));
 
   try {
     const ans = await prologQuery(
-      `js_ai(${player}, ${state.depth}, ColOut, RowOut, Result)`
+      `js_ai('${state.board}',${player},${state.depth},${state.rows},${state.cols},${state.k},ColOut,RowOut,NewBoard,Result)`
     );
-    if (!ans) {
-      setStatus('error', 'ШІ не знайшов хід');
-      return;
-    }
+    if (!ans) { setStatus('error', 'ШІ не знайшов хід'); return; }
 
     const result = ans.lookup('Result').toString();
     const col    = parseInt(ans.lookup('ColOut').toString());
     const row    = parseInt(ans.lookup('RowOut').toString());
 
-    if (result === 'draw' && col === -1) {
-      state.gameOver = true;
-      state.scores.d++;
-      updateScores();
-      setStatus('draw', 'Нічия!');
-      logMsg('sys', 'Нічия — поле заповнене');
-      document.getElementById('btn-surrender').disabled = true;
-      return;
-    }
-
+    state.board = ans.lookup('NewBoard').toString();
     logMsg(player, `${player.toUpperCase()} (ШІ) → стовпець ${col} (рядок ${row})`);
-    await fetchAndRender();
+    renderBoard();
     animateLastDrop(row - 1, col - 1);
     await handleResult(result, player);
   } catch(e) {
@@ -658,46 +588,40 @@ async function handleResult(result, player) {
     state.scores.d++;
     updateScores();
     setStatus('draw', 'Нічия!');
-    logMsg('sys', 'Нічия — поле заповнене');
+    logMsg('sys', 'Нічия');
     document.getElementById('btn-surrender').disabled = true;
     disableArrows(true);
   } else {
-    // result === 'ok'
     state.currentPlayer = player === 'x' ? 'o' : 'x';
     updateStatusText();
-    if (shouldAiMove()) {
-      setTimeout(doAiMove, state.mode === 'pp' ? 300 : 200);
-    } else {
-      disableArrows(false);
-    }
+    if (shouldAiMove()) setTimeout(doAiMove, state.mode === 'pp' ? 300 : 200);
+    else disableArrows(false);
   }
 }
 
 // ============================================================
-// Board rendering (uses cellsCache — no extra Prolog call)
+// Board rendering - pure JS from state.board string
 // ============================================================
-function renderBoardFromCache() {
+function renderBoard() {
+  const { rows, cols, board } = state;
   const grid   = document.getElementById('board-grid');
   const arrows = document.getElementById('col-arrows');
-  const { rows, cols, cellsCache } = state;
-
-  if (!cellsCache) return;
 
   grid.style.gridTemplateColumns = `repeat(${cols}, 50px)`;
   grid.innerHTML = '';
 
-  cellsCache.forEach((val, idx) => {
+  for (let i = 0; i < board.length; i++) {
+    const v = board[i];
     const div = document.createElement('div');
     div.className = 'cell';
-    if      (val === 'x') div.classList.add('cell-x');
-    else if (val === 'o') div.classList.add('cell-o');
-    else if (val === 'b') div.classList.add('cell-blocked');
-    else                  div.classList.add('cell-empty');
-    div.dataset.idx = idx;
+    if      (v === 'x') div.classList.add('cell-x');
+    else if (v === 'o') div.classList.add('cell-o');
+    else if (v === 'b') div.classList.add('cell-blocked');
+    else                div.classList.add('cell-empty');
+    div.dataset.idx = i;
     grid.appendChild(div);
-  });
+  }
 
-  // Rebuild arrows
   arrows.innerHTML = '';
   for (let c = 1; c <= cols; c++) {
     const btn = document.createElement('button');

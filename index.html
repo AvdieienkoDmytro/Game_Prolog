@@ -155,7 +155,6 @@
 </div>
 
 <script src="src/prolog/tau-prolog.js"></script>
-<script src="src/prolog/lists.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────
 const G = {
@@ -166,6 +165,7 @@ const G = {
   gameOver:false,
   scores:{x:0,o:0,d:0},
   busy:false,
+  board: '',   // flat string of rows*cols chars: e/x/o/b
 };
 
 // ── Tau-Prolog helpers ──────────────────────────────────────
@@ -187,35 +187,14 @@ function query(q) {
   });
 }
 
-// Read a variable value from answer as JS string
+// Read atom/number variable from answer
 function val(ans, v) {
   if (!ans || !ans.links) return null;
   const t = ans.links[v];
   if (!t) return null;
-  // atom
   if (t.id !== undefined) return String(t.id);
-  // number
   if (t.value !== undefined) return t.value;
-  // compound - use format_answer on a fake substitution
   return pl.format_answer({links:{X:t}}).replace('X = ','').trim();
-}
-
-// Convert Tau-Prolog list term (possibly list-of-lists) to flat JS array
-function termListToArray(t) {
-  const arr = [];
-  function flatWalk(node) {
-    while (node && node.id === '.' && node.args) {
-      const head = node.args[0];
-      if (head.id === '.' && head.args) {
-        flatWalk(head); // head is a sub-list (row)
-      } else {
-        arr.push(head.id !== undefined ? String(head.id) : String(head.value));
-      }
-      node = node.args[1];
-    }
-  }
-  flatWalk(t);
-  return arr;
 }
 
 // ── Init ───────────────────────────────────────────────────
@@ -244,26 +223,24 @@ async function newGame() {
   G.cols    = Math.max(6, parseInt(document.getElementById('cols').value)||7);
   G.k       = parseInt(document.getElementById('kval').value)||4;
   G.mode    = document.getElementById('mode').value;
-  G.depth   = parseInt(document.getElementById('depth').value)||4;
+  G.depth   = parseInt(document.getElementById('depth').value)||3;
   G.currentPlayer = 'x';
   G.gameOver = false;
   G.busy = false;
 
   document.getElementById('btn-surrender').disabled = false;
 
-  // Build forbidden list
   const forbText = document.getElementById('forbidden').value.trim();
   const forbProlog = forbText ? '[' + forbText.replace(/\s/g,'') + ']' : '[]';
 
   try {
-    // Init board in Prolog DB (forbidden list passed directly)
-    const ans = await query(`js_init(${G.rows}, ${G.cols}, ${G.k}, ${forbProlog})`);
-    if (!ans) throw new Error('js_init failed');
+    const ans = await query(`js_new_board(${G.rows},${G.cols},${forbProlog},BoardAtom)`);
+    if (!ans) throw new Error('js_new_board failed');
+    G.board = String(val(ans, 'BoardAtom'));
 
     logMsg('sys', `Нова гра ${G.rows}x${G.cols} k=${G.k} режим=${G.mode}`);
-    await renderBoard();
+    renderBoard();
     updateStatus();
-
     if (isAI()) setTimeout(doAI, 400);
   } catch(e) {
     setStatus('error', 'Помилка: ' + e.message);
@@ -279,12 +256,17 @@ async function humanClick(col) {
   disableArrows(true);
 
   try {
-    const ans = await query(`js_human(${col}, ${G.currentPlayer}, Row, Result)`);
+    const ans = await query(
+      `js_human('${G.board}',${col},${G.currentPlayer},${G.rows},${G.cols},${G.k},RowOut,NewBoard,Result)`
+    );
     if (!ans) { logMsg('sys', `Стовпець ${col} заповнений`); return; }
 
     const result = String(val(ans, 'Result'));
+    if (result !== 'full') {
+      G.board = String(val(ans, 'NewBoard'));
+    }
     logMsg(G.currentPlayer, `${G.currentPlayer.toUpperCase()} -> стовпець ${col}`);
-    await renderBoard();
+    renderBoard();
     await handleResult(result);
   } catch(e) {
     setStatus('error', e.message);
@@ -306,14 +288,15 @@ async function doAI() {
 
   try {
     const ans = await query(
-      `js_ai(${G.currentPlayer}, ${G.depth}, ColOut, RowOut, Result)`
+      `js_ai('${G.board}',${G.currentPlayer},${G.depth},${G.rows},${G.cols},${G.k},ColOut,RowOut,NewBoard,Result)`
     );
     if (!ans) { setStatus('error', 'ШІ не знайшов хід'); return; }
 
     const col    = val(ans, 'ColOut');
     const result = String(val(ans, 'Result'));
+    G.board = String(val(ans, 'NewBoard'));
     logMsg(G.currentPlayer, `${G.currentPlayer.toUpperCase()} (ШІ) -> стовпець ${col}`);
-    await renderBoard();
+    renderBoard();
     await handleResult(result);
   } catch(e) {
     setStatus('error', 'Помилка ШІ: ' + e.message);
@@ -348,36 +331,29 @@ async function handleResult(result) {
   }
 }
 
-// ── Render board ───────────────────────────────────────────
-async function renderBoard() {
-  const ans = await query('js_get_board(Rows, Cols, K, Cells)');
-  if (!ans || !ans.links) return;
-
-  const rows  = val(ans, 'Rows');
-  const cols  = val(ans, 'Cols');
-  const cells = termListToArray(ans.links['Cells']);
-
+// ── Render board (pure JS, no Prolog call) ─────────────────
+function renderBoard() {
+  const {rows, cols, board} = G;
   const grid   = document.getElementById('board-grid');
   const arrows = document.getElementById('col-arrows');
 
   grid.style.gridTemplateColumns = `repeat(${cols}, 50px)`;
   grid.innerHTML = '';
 
-  cells.forEach((v, idx) => {
+  for (let i = 0; i < board.length; i++) {
+    const v = board[i];
     const div = document.createElement('div');
     div.className = 'cell';
     if      (v === 'x') div.classList.add('cell-x');
     else if (v === 'o') div.classList.add('cell-o');
     else if (v === 'b') { div.classList.add('cell-blocked'); div.textContent = '✕'; }
     else                div.classList.add('cell-empty');
-    const c = (idx % parseInt(cols)) + 1;
-    div.dataset.c = c;
+    div.dataset.c = (i % cols) + 1;
     grid.appendChild(div);
-  });
+  }
 
-  // Arrows
   arrows.innerHTML = '';
-  for (let c = 1; c <= parseInt(cols); c++) {
+  for (let c = 1; c <= cols; c++) {
     const btn = document.createElement('button');
     btn.className = 'col-arrow';
     btn.textContent = '▼';
