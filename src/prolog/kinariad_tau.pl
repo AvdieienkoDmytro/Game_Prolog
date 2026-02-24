@@ -210,86 +210,58 @@ win_exists(Board, Player) :-
 % ============================================================
 
 % eval_board(++Board,++Player,--Score)
+% Fast heuristic: count pieces weighted by column centrality.
+% Avoids full window scan for speed in Tau-Prolog browser env.
 % Multimodality:
 %   eval_board(++,++,--) - compute heuristic score for Player
 eval_board(Board, Player, Score) :-
+    Board = board(_,Cols,_,_,_),
+    Mid is (Cols + 1) // 2,
     opponent(Player, Opp),
-    count_threats(Board, Player, MyPts),
-    count_threats(Board, Opp, OppPts),
-    Score is MyPts - OppPts.
+    center_score(Board, Player, Opp, Mid, 0, Score).
 
-% count_threats(++Board,++Player,--Pts)
+% center_score(++Board,++P,++Opp,++Mid,++Acc,--Score)
+% Walk the flat cell list, accumulating center-weighted score.
 % Multimodality:
-%   count_threats(++,++,--) - aggregate window scores for Player
-count_threats(Board, Player, Pts) :-
-    Board = board(Rows,Cols,K,_,_),
-    findall(P, window_pts(Board,Player,K,Rows,Cols,P), List),
-    sum_list_tau(List, Pts).
+%   center_score(++,++,++,++,++,--) - iterative score accumulation
+center_score(board(Rows,Cols,_,_,Cells), Player, Opp, Mid, Acc, Score) :-
+    center_score_list(Cells, Player, Opp, Mid, Rows, Cols, 1, 1, Acc, Score).
 
-% sum_list_tau(++List,--Sum) - portable sum, avoids library dependency
-% Multimodality:
-%   sum_list_tau(++,--) - sum numeric list
-sum_list_tau([], 0).
-sum_list_tau([H|T], S) :- sum_list_tau(T, S1), S is S1 + H.
-
-% window_pts - generate all K-windows in four directions
-window_pts(Board, Player, K, MaxR, MaxC, Pts) :-
-    between(1,MaxR,R), MCS is MaxC-K+1, between(1,MCS,C),
-    window_score(Board, Player, K, R, C, 0, 1, Pts).
-window_pts(Board, Player, K, MaxR, MaxC, Pts) :-
-    MRS is MaxR-K+1, between(1,MRS,R), between(1,MaxC,C),
-    window_score(Board, Player, K, R, C, 1, 0, Pts).
-window_pts(Board, Player, K, MaxR, MaxC, Pts) :-
-    MRS is MaxR-K+1, MCS is MaxC-K+1,
-    between(1,MRS,R), between(1,MCS,C),
-    window_score(Board, Player, K, R, C, 1, 1, Pts).
-window_pts(Board, Player, K, MaxR, MaxC, Pts) :-
-    MRS is MaxR-K+1, between(K,MaxC,C), between(1,MRS,R),
-    window_score(Board, Player, K, R, C, 1, -1, Pts).
-
-% window_score(++Board,++Player,++K,++R,++C,++DR,++DC,--Pts)
-% Multimodality:
-%   window_score(++,++,++,++,++,++,++,--) - single window heuristic
-window_score(Board, Player, K, R, C, DR, DC, Pts) :-
-    win_count(Board, Player, K, R, C, DR, DC, 0, 0, Mine, OppN),
-    ( OppN > 0 -> Pts = 0 ; score_for(Mine, Pts) ).
-
-% win_count(++B,++P,++K,++R,++C,++DR,++DC,++AM,++AO,--M,--O)
-% Multimodality:
-%   win_count(++,++,++,++,++,++,++,++,++,--,--) - window counting
-win_count(_, _, 0, _, _, _, _, AM, AO, AM, AO) :- !.
-win_count(Board, Player, K, R, C, DR, DC, AM, AO, Mine, Opp) :-
-    K > 0,
-    get_cell(Board, R, C, Val),
-    opponent(Player, OppP),
-    ( Val = Player -> NM is AM+1, NO is AO
-    ; Val = OppP   -> NM is AM,   NO is AO+1
-    ;                 NM is AM,   NO is AO ),
-    K1 is K-1, NR is R+DR, NC is C+DC,
-    win_count(Board, Player, K1, NR, NC, DR, DC, NM, NO, Mine, Opp).
-
-% score_for(++N,--Score) - exponential threat scoring
-% Multimodality:
-%   score_for(++,--) - map piece count to heuristic value
-score_for(1, 1).
-score_for(2, 10).
-score_for(3, 100).
-score_for(4, 1000).
-score_for(N, 100000) :- N >= 5.
+center_score_list([], _, _, _, _, _, _, _, Acc, Acc).
+center_score_list([V|T], Player, Opp, Mid, Rows, Cols, R, C, Acc, Score) :-
+    ( V = Player ->
+        W is 3 - min(2, abs(C - Mid)),
+        NAcc is Acc + W
+    ; V = Opp ->
+        W is 3 - min(2, abs(C - Mid)),
+        NAcc is Acc - W
+    ;
+        NAcc = Acc
+    ),
+    C1 is C + 1,
+    ( C1 > Cols -> NC = 1, NR is R + 1 ; NC = C1, NR = R ),
+    center_score_list(T, Player, Opp, Mid, Rows, Cols, NR, NC, NAcc, Score).
 
 % ============================================================
 % MinMax with Alpha-Beta pruning
-% Depth measured in HALF-MOVES (piv-khody)
+% Depth measured in HALF-MOVES (piv-khody).
+% Win check uses only the last move's landing cell (R,C)
+% instead of win_exists (full board scan).
 % ============================================================
 
-% minimax(++Board,++Depth,++Alpha,++Beta,++Player,++IsMax,--Score)
+% minimax(++Board,++LastR,++LastC,++LastP,++Depth,++Alpha,++Beta,++Player,++IsMax,--Score)
 % Multimodality:
-%   minimax(++,++,++,++,++,++,--) - evaluate game tree node, return score
-minimax(Board, _, _, _, Player, _, 100000) :-
-    opponent(Player, Opp), win_exists(Board, Opp), !.
-minimax(Board, 0, _, _, Player, _, Score) :-
-    !, eval_board(Board, Player, Score).
-minimax(Board, Depth, Alpha, Beta, Player, IsMax, Score) :-
+%   minimax(++,++,++,++,++,++,++,++,++,--) - evaluate game tree node
+minimax(Board, LastR, LastC, LastP, _, _, _, Player, _, 100000) :-
+    LastP \= Player, winner(Board, LastR, LastC, LastP), !.
+minimax(Board, LastR, LastC, LastP, 0, _, _, Player, _, Score) :-
+    !,
+    ( LastP = Player, winner(Board, LastR, LastC, LastP) ->
+        Score = 100000
+    ;
+        eval_board(Board, Player, Score)
+    ).
+minimax(Board, _, _, _, Depth, Alpha, Beta, Player, IsMax, Score) :-
     available_cols(Board, Cols),
     ( Cols = [] ->
         eval_board(Board, Player, Score)
@@ -308,8 +280,8 @@ minimax(Board, Depth, Alpha, Beta, Player, IsMax, Score) :-
 %   expand_max(++,++,++,++,++,++,++,++,--) - maximizer expansion
 expand_max(_, _, _, _, _, _, [], CurA, CurA).
 expand_max(Board, D, Alpha, Beta, Player, NextP, [C|Rest], CurA, Best) :-
-    drop_piece(Board, C, Player, NB, _),
-    minimax(NB, D, CurA, Beta, NextP, false, CS),
+    drop_piece(Board, C, Player, NB, Row),
+    minimax(NB, Row, C, Player, D, CurA, Beta, NextP, false, CS),
     NewA is max(CurA, CS),
     ( NewA >= Beta ->
         Best = NewA
@@ -322,8 +294,8 @@ expand_max(Board, D, Alpha, Beta, Player, NextP, [C|Rest], CurA, Best) :-
 %   expand_min(++,++,++,++,++,++,++,++,--) - minimizer expansion
 expand_min(_, _, _, _, _, _, [], CurB, CurB).
 expand_min(Board, D, Alpha, Beta, Player, NextP, [C|Rest], CurB, Best) :-
-    drop_piece(Board, C, Player, NB, _),
-    minimax(NB, D, Alpha, CurB, NextP, true, CS),
+    drop_piece(Board, C, Player, NB, Row),
+    minimax(NB, Row, C, Player, D, Alpha, CurB, NextP, true, CS),
     NewB is min(CurB, CS),
     ( NewB =< Alpha ->
         Best = NewB
@@ -338,8 +310,8 @@ best_move(Board, Player, Depth, BestCol) :-
     available_cols(Board, [First|RestCols]),
     opponent(Player, NextP),
     D1 is Depth - 1,
-    drop_piece(Board, First, Player, NB0, _),
-    minimax(NB0, D1, -10000000, 10000000, NextP, false, S0),
+    drop_piece(Board, First, Player, NB0, Row0),
+    minimax(NB0, Row0, First, Player, D1, -10000000, 10000000, NextP, false, S0),
     best_move_ab(Board, D1, S0, 10000000, Player, NextP, RestCols,
                  S0, First, _, BestCol).
 
@@ -349,8 +321,8 @@ best_move(Board, Player, Depth, BestCol) :-
 best_move_ab(_, _, _, _, _, _, [], BS, BC, BS, BC).
 best_move_ab(Board, D, Alpha, Beta, Player, NextP, [C|Rest],
              CurBestS, CurBestC, FinalS, FinalC) :-
-    drop_piece(Board, C, Player, NB, _),
-    minimax(NB, D, Alpha, Beta, NextP, false, CS),
+    drop_piece(Board, C, Player, NB, Row),
+    minimax(NB, Row, C, Player, D, Alpha, Beta, NextP, false, CS),
     ( CS > CurBestS ->
         NewBestS = CS, NewBestC = C,
         NewAlpha is max(Alpha, CS)
