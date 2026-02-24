@@ -7,7 +7,9 @@
 %   - Top-level best_move uses alpha-beta directly (no findall over all moves)
 %   - Recommended depth: 2 (fast), 4 (medium), 6 (slow ~5-15s on 7 cols)
 
-:- dynamic current_board/1.
+% Sentinel facts - needed so retractall does not throw on first call
+% (Tau-Prolog requires at least one clause to exist before retractall)
+current_board(none).
 
 % Board: board(Rows, Cols, K, Forbidden, Cells)
 % Cells - flat list Rows*Cols, values: e/x/o/b (empty/x/o/blocked)
@@ -373,7 +375,6 @@ best_move_ab(Board, D, Alpha, Beta, Player, NextP, [C|Rest],
 % STATE via assert - board stored in Prolog DB between JS calls
 % ============================================================
 
-:- dynamic forbidden_list/1.
 forbidden_list([]).
 
 % js_set_forbidden(++ForbList)
