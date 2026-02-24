@@ -445,9 +445,10 @@ async function initProlog() {
 
   // Try relative path first (works with local server), then same-dir fallback
   let src = null;
+  const bust = '?v=' + Date.now();
   for (const path of ['../src/prolog/kinariad_tau.pl', 'kinariad_tau.pl']) {
     try {
-      const resp = await fetch(path);
+      const resp = await fetch(path + bust);
       if (resp.ok) { src = await resp.text(); break; }
     } catch(_) {}
   }
