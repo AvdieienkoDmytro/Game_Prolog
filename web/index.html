@@ -498,11 +498,8 @@ async function newGame() {
   logMsg('sys', `Нова гра ${rows}×${cols} k=${k} режим=${mode} глибина=${depth}`);
 
   try {
-    // 1. Set forbidden list in Prolog DB
-    await prologQuery(`js_set_forbidden(${forbAtom})`);
-
-    // 2. Init game
-    const initAns = await prologQuery(`js_init(${rows}, ${cols}, ${k})`);
+    // Init game (forbidden list passed directly)
+    const initAns = await prologQuery(`js_init(${rows}, ${cols}, ${k}, ${forbAtom})`);
     if (!initAns) throw new Error('js_init failed');
 
     // 3. Fetch board for rendering

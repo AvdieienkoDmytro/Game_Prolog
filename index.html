@@ -249,9 +249,8 @@ async function newGame() {
   const forbProlog = forbText ? '[' + forbText.replace(/\s/g,'') + ']' : '[]';
 
   try {
-    // Set forbidden and init board in Prolog DB
-    await query(`js_set_forbidden(${forbProlog})`);
-    const ans = await query(`js_init(${G.rows}, ${G.cols}, ${G.k})`);
+    // Init board in Prolog DB (forbidden list passed directly)
+    const ans = await query(`js_init(${G.rows}, ${G.cols}, ${G.k}, ${forbProlog})`);
     if (!ans) throw new Error('js_init failed');
 
     logMsg('sys', `Нова гра ${G.rows}x${G.cols} k=${G.k} режим=${G.mode}`);

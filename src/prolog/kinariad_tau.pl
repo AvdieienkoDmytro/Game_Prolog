@@ -2,13 +2,12 @@
 % Tau-Prolog 0.3.4 compatible - pure ASCII comments
 % Author: Avdieienko Dmytro Maksymovych
 %
-% Performance notes for browser (Tau-Prolog is ~50x slower than SWI):
-%   - Column ordering: center-first improves alpha-beta cutoffs
-%   - Top-level best_move uses alpha-beta directly (no findall over all moves)
-%   - Recommended depth: 2 (fast), 4 (medium), 6 (slow ~5-15s on 7 cols)
+% NOTE: No :- dynamic directives (unsupported in Tau-Prolog consult).
+% current_board/1 is declared as a static fact here so retractall works.
+% JS must call assertz(current_board(none)) once after consult to register it.
 
-% Sentinel facts - needed so retractall does not throw on first call
-% (Tau-Prolog requires at least one clause to exist before retractall)
+% Sentinel - makes current_board/1 known to the DB so retractall won't throw.
+% JS init code replaces this immediately via retractall+assertz.
 current_board(none).
 
 % Board: board(Rows, Cols, K, Forbidden, Cells)
@@ -132,7 +131,6 @@ sort_center([H|T], Mid, Sorted) :-
     insert_by_dist(H, DH, SortedT, Mid, Sorted).
 
 % insert_by_dist(++Col,++Dist,++SortedList,++Mid,--Result)
-% Insert Col into a list already sorted by distance to Mid.
 % Multimodality:
 %   insert_by_dist(++,++,++,++,--) - insertion step for center-first sort
 insert_by_dist(C, _, [], _, [C]).
@@ -155,7 +153,6 @@ opponent(x, o).
 opponent(o, x).
 
 % winner(++Board,++R,++C,--Player)
-% True if piece at (R,C) completes K in a row for Player.
 % Multimodality:
 %   winner(++,++,++,--) - detect winner after move at (R,C)
 %   winner(++,++,++,+)  - check if specific player won at (R,C)
@@ -170,8 +167,6 @@ winner(Board, R, C, Player) :-
     ).
 
 % check_dir(++Board,++R,++C,++Player,++K,++DR,++DC)
-% Count consecutive Player pieces through (R,C) in axis (DR,DC) and opposite.
-% Win if total >= K.
 % Multimodality:
 %   check_dir(++,++,++,++,++,++,++) - directional win check
 check_dir(Board, R, C, Player, K, DR, DC) :-
@@ -182,7 +177,6 @@ check_dir(Board, R, C, Player, K, DR, DC) :-
     Total >= K.
 
 % count_dir(++Board,++R,++C,++Player,++DR,++DC,++Acc,--Count)
-% Count Player pieces starting at (R,C) in direction (DR,DC).
 % Multimodality:
 %   count_dir(++,++,++,++,++,++,++,--) - directional piece count
 count_dir(Board, R, C, Player, DR, DC, Acc, Count) :-
@@ -207,7 +201,6 @@ win_exists(Board, Player) :-
 % ============================================================
 
 % eval_board(++Board,++Player,--Score)
-% Heuristic: Player threat points minus opponent threat points.
 % Multimodality:
 %   eval_board(++,++,--) - compute heuristic score for Player
 eval_board(Board, Player, Score) :-
@@ -217,7 +210,6 @@ eval_board(Board, Player, Score) :-
     Score is MyPts - OppPts.
 
 % count_threats(++Board,++Player,--Pts)
-% Sum heuristic points over all K-windows on the board.
 % Multimodality:
 %   count_threats(++,++,--) - aggregate window scores for Player
 count_threats(Board, Player, Pts) :-
@@ -247,7 +239,6 @@ window_pts(Board, Player, K, MaxR, MaxC, Pts) :-
     window_score(Board, Player, K, R, C, 1, -1, Pts).
 
 % window_score(++Board,++Player,++K,++R,++C,++DR,++DC,--Pts)
-% Score a K-length window: 0 if opponent has any piece here.
 % Multimodality:
 %   window_score(++,++,++,++,++,++,++,--) - single window heuristic
 window_score(Board, Player, K, R, C, DR, DC, Pts) :-
@@ -255,7 +246,6 @@ window_score(Board, Player, K, R, C, DR, DC, Pts) :-
     ( OppN > 0 -> Pts = 0 ; score_for(Mine, Pts) ).
 
 % win_count(++B,++P,++K,++R,++C,++DR,++DC,++AM,++AO,--M,--O)
-% Count Player and opponent pieces in K-length window.
 % Multimodality:
 %   win_count(++,++,++,++,++,++,++,++,++,--,--) - window counting
 win_count(_, _, 0, _, _, _, _, AM, AO, AM, AO) :- !.
@@ -284,17 +274,12 @@ score_for(N, 100000) :- N >= 5.
 % ============================================================
 
 % minimax(++Board,++Depth,++Alpha,++Beta,++Player,++IsMax,--Score)
-% Alpha-Beta minimax. IsMax=true for maximizer, false for minimizer.
 % Multimodality:
 %   minimax(++,++,++,++,++,++,--) - evaluate game tree node, return score
-
-% Terminal: opponent already won before this move
 minimax(Board, _, _, _, Player, _, 100000) :-
     opponent(Player, Opp), win_exists(Board, Opp), !.
-% Terminal: depth reached - heuristic evaluation
 minimax(Board, 0, _, _, Player, _, Score) :-
     !, eval_board(Board, Player, Score).
-% Recursive: expand children with alpha-beta
 minimax(Board, Depth, Alpha, Beta, Player, IsMax, Score) :-
     available_cols(Board, Cols),
     ( Cols = [] ->
@@ -310,7 +295,6 @@ minimax(Board, Depth, Alpha, Beta, Player, IsMax, Score) :-
     ).
 
 % expand_max(++B,++D,++A,++Bt,++P,++NP,++Cols,++CurA,--Best)
-% Maximizer: iterate columns, update alpha, beta-cutoff.
 % Multimodality:
 %   expand_max(++,++,++,++,++,++,++,++,--) - maximizer expansion
 expand_max(_, _, _, _, _, _, [], CurA, CurA).
@@ -325,7 +309,6 @@ expand_max(Board, D, Alpha, Beta, Player, NextP, [C|Rest], CurA, Best) :-
     ).
 
 % expand_min(++B,++D,++A,++Bt,++P,++NP,++Cols,++CurB,--Best)
-% Minimizer: iterate columns, update beta, alpha-cutoff.
 % Multimodality:
 %   expand_min(++,++,++,++,++,++,++,++,--) - minimizer expansion
 expand_min(_, _, _, _, _, _, [], CurB, CurB).
@@ -340,7 +323,6 @@ expand_min(Board, D, Alpha, Beta, Player, NextP, [C|Rest], CurB, Best) :-
     ).
 
 % best_move(++Board,++Player,++Depth,--BestCol)
-% Find best column using alpha-beta at top level.
 % Multimodality:
 %   best_move(++,++,++,--) - AI move selection (main entry point)
 best_move(Board, Player, Depth, BestCol) :-
@@ -353,7 +335,6 @@ best_move(Board, Player, Depth, BestCol) :-
                  S0, First, _, BestCol).
 
 % best_move_ab(++B,++D,++A,++Bt,++P,++NP,++Cols,++BestS,++BestC,--BS,--BC)
-% Alpha-beta search at root level, tracking best column explicitly.
 % Multimodality:
 %   best_move_ab(++,++,++,++,++,++,++,++,++,--,--) - root alpha-beta
 best_move_ab(_, _, _, _, _, _, [], BS, BC, BS, BC).
@@ -373,24 +354,14 @@ best_move_ab(Board, D, Alpha, Beta, Player, NextP, [C|Rest],
 
 % ============================================================
 % STATE via assert - board stored in Prolog DB between JS calls
+% js_init/3 now receives forbidden list directly (no dynamic forbidden_list)
 % ============================================================
 
-forbidden_list([]).
-
-% js_set_forbidden(++ForbList)
-% Set forbidden cells list in Prolog DB.
+% js_init(++Rows,++Cols,++K,++Forb)
+% Create new game. Forb is a Prolog list of (R,C) pairs.
 % Multimodality:
-%   js_set_forbidden(++) - store forbidden cells for next js_init
-js_set_forbidden(Forb) :-
-    retractall(forbidden_list(_)),
-    assertz(forbidden_list(Forb)).
-
-% js_init(++Rows,++Cols,++K)
-% Create new game using stored forbidden list.
-% Multimodality:
-%   js_init(++,++,++) - initialize game state in DB
-js_init(Rows, Cols, K) :-
-    forbidden_list(Forb),
+%   js_init(++,++,++,++) - initialize game state in DB
+js_init(Rows, Cols, K, Forb) :-
     new_game(Rows, Cols, K, Forb, Board),
     retractall(current_board(_)),
     assertz(current_board(Board)).
@@ -442,7 +413,6 @@ js_ai(Player, Depth, ColOut, RowOut, Result) :-
     ).
 
 % js_get_board(--Rows,--Cols,--K,--CellList)
-% Return current board state for rendering.
 % Multimodality:
 %   js_get_board(--,--,--,--) - read-only board access for JS renderer
 js_get_board(Rows, Cols, K, Cells) :-
