@@ -3,94 +3,91 @@
 % Author: Avdieienko Dmytro Maksymovych
 %
 % NOTE: dynamic must be written as :- dynamic(Name/Arity). in Tau-Prolog consult.
-% current_board/1 sentinel fact allows js_get_board before first js_init.
+% Board is stored as list of rows (list of lists) for O(Cols) cell access.
 
 :- dynamic(current_board/1).
 
-% Sentinel - makes current_board/1 known to the DB so retractall won't throw.
-% JS init code replaces this immediately via retractall+assertz.
+% Sentinel
 current_board(none).
 
-% Board: board(Rows, Cols, K, Forbidden, Cells)
-% Cells - flat list Rows*Cols, values: e/x/o/b (empty/x/o/blocked)
+% Board: board(Rows, Cols, K, Forbidden, RowList)
+% RowList = [[c11,c12,...,c1m], [c21,...], ..., [cn1,...,cnm]]
+% Cell values: e (empty), x, o, b (blocked)
+
+% ============================================================
+% Utilities
+% ============================================================
+
+% list_nth1(++N,++List,--Elem)
+list_nth1(1, [H|_], H) :- !.
+list_nth1(N, [_|T], H) :- N > 1, N1 is N-1, list_nth1(N1, T, H).
+
+% list_set_nth1(++N,++List,++Val,--NewList)
+list_set_nth1(1, [_|T], Val, [Val|T]) :- !.
+list_set_nth1(N, [H|T], Val, [H|NT]) :-
+    N > 1, N1 is N-1, list_set_nth1(N1, T, Val, NT).
+
+% list_member(++X,++List)
+list_member(X, [X|_]) :- !.
+list_member(X, [_|T]) :- list_member(X, T).
+
+% make_row_lr(++C,++Cols,++R,++Forb,--Row) - build row left-to-right
+make_row_lr(1, Cols, R, Forb, [Cell]) :-
+    !,
+    ( list_member((R,Cols), Forb) -> Cell = b ; Cell = e ).
+make_row_lr(C, Cols, R, Forb, [Cell|Rest]) :-
+    C =< Cols,
+    ( list_member((R,C), Forb) -> Cell = b ; Cell = e ),
+    C1 is C + 1,
+    make_row_lr(C1, Cols, R, Forb, Rest).
+
+% make_rows(++R,++Rows,++Cols,++Forb,--RowList)
+make_rows(R, Rows, _, _, []) :- R > Rows, !.
+make_rows(R, Rows, Cols, Forb, [Row|Rest]) :-
+    R =< Rows,
+    make_row_lr(1, Cols, R, Forb, Row),
+    R1 is R + 1,
+    make_rows(R1, Rows, Cols, Forb, Rest).
 
 % ============================================================
 % Board construction
 % ============================================================
 
-% make_list(++N,--List) - create a list of N uninstantiated variables
-% Multimodality:
-%   make_list(++,--) - create list of length N
-make_list(0, []) :- !.
-make_list(N, [_|T]) :- N > 0, N1 is N-1, make_list(N1, T).
-
-% list_member(++Elem,++List) - membership without library(lists)
-% Multimodality:
-%   list_member(++,++) - check membership
-list_member(X, [X|_]) :- !.
-list_member(X, [_|T]) :- list_member(X, T).
-
 % new_game(++Rows,++Cols,++K,++Forb,--Board)
 % Multimodality:
-%   new_game(++,++,++,++,--) - create board (main use)
+%   new_game(++,++,++,++,--) - create new board
 %   new_game(++,++,++,++,+)  - verify board parameters
-new_game(Rows, Cols, K, Forb, board(Rows,Cols,K,Forb,Cells)) :-
-    Size is Rows * Cols,
-    make_list(Size, Cells),
-    init_cells(Cells, Rows, Cols, Forb, 1, 1).
-
-% init_cells(++Cells,++Rows,++Cols,++Forb,++CR,++CC)
-% Multimodality:
-%   init_cells(++,++,++,++,++,++) - deterministic initialization
-init_cells([], _, _, _, _, _).
-init_cells([Cell|Rest], Rows, Cols, Forb, CR, CC) :-
-    ( list_member((CR,CC), Forb) -> Cell = b ; Cell = e ),
-    CC1 is CC + 1,
-    ( CC1 > Cols -> NCC = 1, NCR is CR + 1 ; NCC = CC1, NCR = CR ),
-    init_cells(Rest, Rows, Cols, Forb, NCR, NCC).
+new_game(Rows, Cols, K, Forb, board(Rows,Cols,K,Forb,RowList)) :-
+    make_rows(1, Rows, Cols, Forb, RowList).
 
 % ============================================================
-% Cell access - direct list walk, no nth1 overhead
+% Cell access - O(R + C) via row list
 % ============================================================
 
 % get_cell(++Board,++R,++C,--Val)
 % Multimodality:
-%   get_cell(++,++,++,--) - read cell value (O(R*Cols+C) walk)
+%   get_cell(++,++,++,--) - read cell value
 %   get_cell(++,++,++,+)  - check cell value
-get_cell(board(_,Cols,_,_,Cells), R, C, Val) :-
-    Idx is (R-1)*Cols + C,
-    list_nth1(Idx, Cells, Val).
-
-% list_nth1(++Idx,++List,--Val) - fast 1-based list access, no library call
-% Multimodality:
-%   list_nth1(++,++,--) - access element at 1-based position
-list_nth1(1, [H|_], H) :- !.
-list_nth1(N, [_|T], H) :- N > 1, N1 is N-1, list_nth1(N1, T, H).
+get_cell(board(_,_,_,_,RowList), R, C, Val) :-
+    list_nth1(R, RowList, Row),
+    list_nth1(C, Row, Val).
 
 % set_cell(++Board,++R,++C,++Val,--NewBoard)
 % Multimodality:
-%   set_cell(++,++,++,++,--) - return new board with updated cell
-set_cell(board(Rows,Cols,K,Forb,Cells), R, C, Val,
-         board(Rows,Cols,K,Forb,NC)) :-
-    Idx is (R-1)*Cols + C,
-    replace_nth1(Idx, Cells, Val, NC).
-
-% replace_nth1(++Idx,++List,++Val,--NewList)
-% Multimodality:
-%   replace_nth1(++,++,++,--) - replace element at 1-based position
-replace_nth1(1, [_|T], Val, [Val|T]) :- !.
-replace_nth1(I, [H|T], Val, [H|NT]) :-
-    I > 1, I1 is I-1,
-    replace_nth1(I1, T, Val, NT).
+%   set_cell(++,++,++,++,--) - return new board with cell updated
+set_cell(board(Rows,Cols,K,Forb,RowList), R, C, Val,
+         board(Rows,Cols,K,Forb,NewRowList)) :-
+    list_nth1(R, RowList, OldRow),
+    list_set_nth1(C, OldRow, Val, NewRow),
+    list_set_nth1(R, RowList, NewRow, NewRowList).
 
 % ============================================================
-% Gravity: piece falls to lowest free row in column
+% Gravity
 % ============================================================
 
 % drop_piece(++Board,++Col,++Player,--NewBoard,--Row)
 % Multimodality:
-%   drop_piece(++,++,++,--,--) - drop piece, get new board and landing row
-%   drop_piece(++,++,++,--,+)  - also verify landing row
+%   drop_piece(++,++,++,--,--) - drop piece, return board and landing row
 drop_piece(Board, Col, Player, NewBoard, Row) :-
     Board = board(Rows,_,_,_,_),
     find_bottom(Board, Col, Rows, Row),
@@ -111,52 +108,50 @@ find_bottom(Board, Col, CurR, Row) :-
 
 % col_available(++Board,++Col)
 % Multimodality:
-%   col_available(++,++) - check if top cell is empty (can drop piece)
+%   col_available(++,++) - check if column has room
 col_available(Board, Col) :-
     Board = board(_,Cols,_,_,_),
     Col >= 1, Col =< Cols,
     get_cell(Board, 1, Col, e).
 
 % available_cols(++Board,--Sorted)
-% Returns columns sorted center-first for better alpha-beta cutoffs.
 % Multimodality:
-%   available_cols(++,--) - enumerate legal moves, center-first order
+%   available_cols(++,--) - legal moves sorted center-first
 available_cols(Board, Sorted) :-
-    Board = board(_,MaxC,_,_,_),
+    Board = board(_,MaxC,_,_,RowList),
+    list_nth1(1, RowList, TopRow),
     Mid is (MaxC + 1) // 2,
-    collect_avail(Board, 1, MaxC, Cols),
-    sort_center(Cols, Mid, Sorted).
+    collect_avail_row(TopRow, 1, AvailCols),
+    sort_center(AvailCols, Mid, Sorted).
 
-% collect_avail(++Board,++C,++MaxC,--Cols)
+% collect_avail_row(++Row,++C,--AvailCols)
 % Multimodality:
-%   collect_avail(++,++,++,--) - collect available columns without findall
-collect_avail(_, C, MaxC, []) :- C > MaxC, !.
-collect_avail(Board, C, MaxC, Result) :-
+%   collect_avail_row(++,++,--) - collect available columns from top row
+collect_avail_row([], _, []).
+collect_avail_row([V|T], C, Result) :-
     C1 is C + 1,
-    ( get_cell(Board, 1, C, e) ->
+    ( V = e ->
         Result = [C|Rest],
-        collect_avail(Board, C1, MaxC, Rest)
+        collect_avail_row(T, C1, Rest)
     ;
-        collect_avail(Board, C1, MaxC, Result)
+        collect_avail_row(T, C1, Result)
     ).
 
 % sort_center(++Cols,++Mid,--Sorted)
-% Sort columns by distance to center using insertion sort (avoids msort).
 % Multimodality:
-%   sort_center(++,++,--) - center-first column ordering
+%   sort_center(++,++,--) - insertion sort by distance to center
 sort_center([], _, []).
 sort_center([H|T], Mid, Sorted) :-
     sort_center(T, Mid, SortedT),
     DH is abs(H - Mid),
     insert_by_dist(H, DH, SortedT, Mid, Sorted).
 
-% insert_by_dist(++Col,++Dist,++SortedList,++Mid,--Result)
+% insert_by_dist(++Col,++Dist,++List,++Mid,--Result)
 % Multimodality:
-%   insert_by_dist(++,++,++,++,--) - insertion step for center-first sort
+%   insert_by_dist(++,++,++,++,--) - insertion step
 insert_by_dist(C, _, [], _, [C]).
 insert_by_dist(C, DC, [H|T], Mid, [C,H|T]) :-
-    DH is abs(H - Mid),
-    DC =< DH, !.
+    DH is abs(H - Mid), DC =< DH, !.
 insert_by_dist(C, DC, [H|T], Mid, [H|Rest]) :-
     insert_by_dist(C, DC, T, Mid, Rest).
 
@@ -166,16 +161,16 @@ insert_by_dist(C, DC, [H|T], Mid, [H|Rest]) :-
 
 % opponent(++P,--Opp)
 % Multimodality:
-%   opponent(++,--) - get opponent symbol
-%   opponent(--,++) - reverse lookup (symmetric)
-%   opponent(++,+)  - verify pair
+%   opponent(++,--) - get opponent
+%   opponent(--,++) - reverse lookup
+%   opponent(++,+)  - verify
 opponent(x, o).
 opponent(o, x).
 
-% winner(++Board,++R,++C,--Player)
+% winner(++Board,++R,++C,++Player)
 % Multimodality:
 %   winner(++,++,++,--) - detect winner after move at (R,C)
-%   winner(++,++,++,+)  - check if specific player won at (R,C)
+%   winner(++,++,++,+)  - check if player won at (R,C)
 winner(Board, R, C, Player) :-
     get_cell(Board, R, C, Player),
     Player \= e, Player \= b,
@@ -188,7 +183,7 @@ winner(Board, R, C, Player) :-
 
 % check_dir(++Board,++R,++C,++Player,++K,++DR,++DC)
 % Multimodality:
-%   check_dir(++,++,++,++,++,++,++) - directional win check
+%   check_dir(++,++,++,++,++,++,++) - check K-in-a-row in direction
 check_dir(Board, R, C, Player, K, DR, DC) :-
     count_dir(Board, R, C, Player, DR, DC, 0, N1),
     NDR is -DR, NDC is -DC,
@@ -198,7 +193,7 @@ check_dir(Board, R, C, Player, K, DR, DC) :-
 
 % count_dir(++Board,++R,++C,++Player,++DR,++DC,++Acc,--Count)
 % Multimodality:
-%   count_dir(++,++,++,++,++,++,++,--) - directional piece count
+%   count_dir(++,++,++,++,++,++,++,--) - count consecutive pieces
 count_dir(Board, R, C, Player, DR, DC, Acc, Count) :-
     Board = board(MaxR,MaxC,_,_,_),
     R >= 1, R =< MaxR, C >= 1, C =< MaxC,
@@ -221,25 +216,28 @@ win_exists(Board, Player) :-
 % ============================================================
 
 % eval_board(++Board,++Player,--Score)
-% Fast heuristic: count pieces weighted by column centrality.
-% Avoids full window scan for speed in Tau-Prolog browser env.
+% Fast heuristic: center-weighted piece count.
 % Multimodality:
 %   eval_board(++,++,--) - compute heuristic score for Player
 eval_board(Board, Player, Score) :-
-    Board = board(_,Cols,_,_,_),
+    Board = board(_,Cols,_,_,RowList),
     Mid is (Cols + 1) // 2,
     opponent(Player, Opp),
-    center_score(Board, Player, Opp, Mid, 0, Score).
+    score_rows(RowList, Player, Opp, Mid, 0, Score).
 
-% center_score(++Board,++P,++Opp,++Mid,++Acc,--Score)
-% Walk the flat cell list, accumulating center-weighted score.
+% score_rows(++RowList,++P,++Opp,++Mid,++Acc,--Score)
 % Multimodality:
-%   center_score(++,++,++,++,++,--) - iterative score accumulation
-center_score(board(Rows,Cols,_,_,Cells), Player, Opp, Mid, Acc, Score) :-
-    center_score_list(Cells, Player, Opp, Mid, Rows, Cols, 1, 1, Acc, Score).
+%   score_rows(++,++,++,++,++,--) - sum scores across all rows
+score_rows([], _, _, _, Acc, Acc).
+score_rows([Row|Rest], Player, Opp, Mid, Acc, Score) :-
+    score_row(Row, Player, Opp, Mid, 1, Acc, Acc2),
+    score_rows(Rest, Player, Opp, Mid, Acc2, Score).
 
-center_score_list([], _, _, _, _, _, _, _, Acc, Acc).
-center_score_list([V|T], Player, Opp, Mid, Rows, Cols, R, C, Acc, Score) :-
+% score_row(++Row,++P,++Opp,++Mid,++C,++Acc,--Score)
+% Multimodality:
+%   score_row(++,++,++,++,++,++,--) - score one row
+score_row([], _, _, _, _, Acc, Acc).
+score_row([V|T], Player, Opp, Mid, C, Acc, Score) :-
     ( V = Player ->
         W is 3 - min(2, abs(C - Mid)),
         NAcc is Acc + W
@@ -250,24 +248,21 @@ center_score_list([V|T], Player, Opp, Mid, Rows, Cols, R, C, Acc, Score) :-
         NAcc = Acc
     ),
     C1 is C + 1,
-    ( C1 > Cols -> NC = 1, NR is R + 1 ; NC = C1, NR = R ),
-    center_score_list(T, Player, Opp, Mid, Rows, Cols, NR, NC, NAcc, Score).
+    score_row(T, Player, Opp, Mid, C1, NAcc, Score).
 
 % ============================================================
 % MinMax with Alpha-Beta pruning
-% Depth measured in HALF-MOVES (piv-khody).
-% Win check uses only the last move's landing cell (R,C)
-% instead of win_exists (full board scan).
+% Depth in HALF-MOVES. Win detected at landing cell only.
 % ============================================================
 
-% minimax(++Board,++LastR,++LastC,++LastP,++Depth,++Alpha,++Beta,++Player,++IsMax,--Score)
+% minimax(++Board,++LR,++LC,++LP,++Depth,++Alpha,++Beta,++Player,++IsMax,--Score)
 % Multimodality:
 %   minimax(++,++,++,++,++,++,++,++,++,--) - evaluate game tree node
-minimax(Board, LastR, LastC, LastP, _, _, _, Player, _, 100000) :-
-    LastP \= Player, winner(Board, LastR, LastC, LastP), !.
-minimax(Board, LastR, LastC, LastP, 0, _, _, Player, _, Score) :-
+minimax(Board, LR, LC, LP, _, _, _, Player, _, 100000) :-
+    LP \= Player, winner(Board, LR, LC, LP), !.
+minimax(Board, LR, LC, LP, 0, _, _, Player, _, Score) :-
     !,
-    ( LastP = Player, winner(Board, LastR, LastC, LastP) ->
+    ( LP = Player, winner(Board, LR, LC, LP) ->
         Score = 100000
     ;
         eval_board(Board, Player, Score)
@@ -316,7 +311,7 @@ expand_min(Board, D, Alpha, Beta, Player, NextP, [C|Rest], CurB, Best) :-
 
 % best_move(++Board,++Player,++Depth,--BestCol)
 % Multimodality:
-%   best_move(++,++,++,--) - AI move selection (main entry point)
+%   best_move(++,++,++,--) - AI move selection
 best_move(Board, Player, Depth, BestCol) :-
     available_cols(Board, [First|RestCols]),
     opponent(Player, NextP),
@@ -326,42 +321,40 @@ best_move(Board, Player, Depth, BestCol) :-
     best_move_ab(Board, D1, S0, 10000000, Player, NextP, RestCols,
                  S0, First, _, BestCol).
 
-% best_move_ab(++B,++D,++A,++Bt,++P,++NP,++Cols,++BestS,++BestC,--BS,--BC)
+% best_move_ab(++B,++D,++A,++Bt,++P,++NP,++Cols,++BS,++BC,--FS,--FC)
 % Multimodality:
-%   best_move_ab(++,++,++,++,++,++,++,++,++,--,--) - root alpha-beta
+%   best_move_ab(++,++,++,++,++,++,++,++,++,--,--) - root alpha-beta loop
 best_move_ab(_, _, _, _, _, _, [], BS, BC, BS, BC).
 best_move_ab(Board, D, Alpha, Beta, Player, NextP, [C|Rest],
-             CurBestS, CurBestC, FinalS, FinalC) :-
+             CurBS, CurBC, FS, FC) :-
     drop_piece(Board, C, Player, NB, Row),
     minimax(NB, Row, C, Player, D, Alpha, Beta, NextP, false, CS),
-    ( CS > CurBestS ->
-        NewBestS = CS, NewBestC = C,
+    ( CS > CurBS ->
+        NewBS = CS, NewBC = C,
         NewAlpha is max(Alpha, CS)
     ;
-        NewBestS = CurBestS, NewBestC = CurBestC,
+        NewBS = CurBS, NewBC = CurBC,
         NewAlpha = Alpha
     ),
     best_move_ab(Board, D, NewAlpha, Beta, Player, NextP, Rest,
-                 NewBestS, NewBestC, FinalS, FinalC).
+                 NewBS, NewBC, FS, FC).
 
 % ============================================================
-% STATE via assert - board stored in Prolog DB between JS calls
-% js_init/3 now receives forbidden list directly (no dynamic forbidden_list)
+% JS interface
 % ============================================================
 
 % js_init(++Rows,++Cols,++K,++Forb)
-% Create new game. Forb is a Prolog list of (R,C) pairs.
 % Multimodality:
-%   js_init(++,++,++,++) - initialize game state in DB
+%   js_init(++,++,++,++) - initialize game
 js_init(Rows, Cols, K, Forb) :-
     new_game(Rows, Cols, K, Forb, Board),
     retractall(current_board(_)),
     assertz(current_board(Board)).
 
 % js_human(++Col,++Player,--RowOut,--Result)
-% Execute human move. Result: ok/full/win/draw.
+% Result: ok / full / win / draw
 % Multimodality:
-%   js_human(++,++,--,--) - human move with result reporting
+%   js_human(++,++,--,--) - execute human move
 js_human(Col, Player, RowOut, Result) :-
     current_board(Board),
     ( col_available(Board, Col) ->
@@ -382,9 +375,8 @@ js_human(Col, Player, RowOut, Result) :-
     ).
 
 % js_ai(++Player,++Depth,--ColOut,--RowOut,--Result)
-% Execute AI move using MinMax+Alpha-Beta.
 % Multimodality:
-%   js_ai(++,++,--,--,--) - AI move with result reporting
+%   js_ai(++,++,--,--,--) - execute AI move
 js_ai(Player, Depth, ColOut, RowOut, Result) :-
     current_board(Board),
     ( available_cols(Board, []) ->
@@ -404,8 +396,24 @@ js_ai(Player, Depth, ColOut, RowOut, Result) :-
         )
     ).
 
-% js_get_board(--Rows,--Cols,--K,--CellList)
+% js_get_board(--Rows,--Cols,--K,--FlatCells)
+% Returns cells as flat list for JS renderer.
 % Multimodality:
-%   js_get_board(--,--,--,--) - read-only board access for JS renderer
-js_get_board(Rows, Cols, K, Cells) :-
-    current_board(board(Rows,Cols,K,_,Cells)).
+%   js_get_board(--,--,--,--) - read board for rendering
+js_get_board(Rows, Cols, K, FlatCells) :-
+    current_board(board(Rows,Cols,K,_,RowList)),
+    flatten_rows(RowList, FlatCells).
+
+% flatten_rows(++RowList,--FlatList)
+% Multimodality:
+%   flatten_rows(++,--) - flatten list of rows to single list
+flatten_rows([], []).
+flatten_rows([Row|Rest], Flat) :-
+    flatten_rows(Rest, FlatRest),
+    append_lists(Row, FlatRest, Flat).
+
+% append_lists(++L1,++L2,--L3)
+% Multimodality:
+%   append_lists(++,++,--) - concatenate two lists
+append_lists([], L, L).
+append_lists([H|T], L, [H|R]) :- append_lists(T, L, R).
