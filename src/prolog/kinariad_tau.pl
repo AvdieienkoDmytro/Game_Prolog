@@ -5,7 +5,6 @@
 % NOTE: dynamic must be written as :- dynamic(Name/Arity). in Tau-Prolog consult.
 % current_board/1 sentinel fact allows js_get_board before first js_init.
 
-:- use_module(library(lists)).
 :- dynamic(current_board/1).
 
 % Sentinel - makes current_board/1 known to the DB so retractall won't throw.
@@ -20,11 +19,16 @@ current_board(none).
 % ============================================================
 
 % make_list(++N,--List) - create a list of N uninstantiated variables
-% Replaces length/2 which requires lists module in Tau-Prolog.
 % Multimodality:
 %   make_list(++,--) - create list of length N
 make_list(0, []) :- !.
 make_list(N, [_|T]) :- N > 0, N1 is N-1, make_list(N1, T).
+
+% list_member(++Elem,++List) - membership without library(lists)
+% Multimodality:
+%   list_member(++,++) - check membership
+list_member(X, [X|_]) :- !.
+list_member(X, [_|T]) :- list_member(X, T).
 
 % new_game(++Rows,++Cols,++K,++Forb,--Board)
 % Multimodality:
@@ -40,47 +44,41 @@ new_game(Rows, Cols, K, Forb, board(Rows,Cols,K,Forb,Cells)) :-
 %   init_cells(++,++,++,++,++,++) - deterministic initialization
 init_cells([], _, _, _, _, _).
 init_cells([Cell|Rest], Rows, Cols, Forb, CR, CC) :-
-    ( member((CR,CC), Forb) -> Cell = b ; Cell = e ),
+    ( list_member((CR,CC), Forb) -> Cell = b ; Cell = e ),
     CC1 is CC + 1,
     ( CC1 > Cols -> NCC = 1, NCR is CR + 1 ; NCC = CC1, NCR = CR ),
     init_cells(Rest, Rows, Cols, Forb, NCR, NCC).
 
 % ============================================================
-% Cell access
+% Cell access - direct list walk, no nth1 overhead
 % ============================================================
-
-% cell_idx(++R,++C,++Cols,--Idx) or cell_idx(--R,--C,++Cols,++Idx)
-% Multimodality:
-%   cell_idx(++,++,++,--) - compute 1-based index
-%   cell_idx(--,--,++,++) - recover coordinates from index
-cell_idx(R, C, Cols, Idx) :-
-    ( var(Idx) ->
-        Idx is (R-1)*Cols + C
-    ;
-        R is (Idx-1)//Cols + 1,
-        C is (Idx-1) mod Cols + 1
-    ).
 
 % get_cell(++Board,++R,++C,--Val)
 % Multimodality:
-%   get_cell(++,++,++,--) - read cell value
+%   get_cell(++,++,++,--) - read cell value (O(R*Cols+C) walk)
 %   get_cell(++,++,++,+)  - check cell value
 get_cell(board(_,Cols,_,_,Cells), R, C, Val) :-
-    cell_idx(R, C, Cols, Idx),
-    nth1(Idx, Cells, Val).
+    Idx is (R-1)*Cols + C,
+    list_nth1(Idx, Cells, Val).
+
+% list_nth1(++Idx,++List,--Val) - fast 1-based list access, no library call
+% Multimodality:
+%   list_nth1(++,++,--) - access element at 1-based position
+list_nth1(1, [H|_], H) :- !.
+list_nth1(N, [_|T], H) :- N > 1, N1 is N-1, list_nth1(N1, T, H).
 
 % set_cell(++Board,++R,++C,++Val,--NewBoard)
 % Multimodality:
 %   set_cell(++,++,++,++,--) - return new board with updated cell
 set_cell(board(Rows,Cols,K,Forb,Cells), R, C, Val,
          board(Rows,Cols,K,Forb,NC)) :-
-    cell_idx(R, C, Cols, Idx),
+    Idx is (R-1)*Cols + C,
     replace_nth1(Idx, Cells, Val, NC).
 
 % replace_nth1(++Idx,++List,++Val,--NewList)
 % Multimodality:
 %   replace_nth1(++,++,++,--) - replace element at 1-based position
-replace_nth1(1, [_|T], Val, [Val|T]).
+replace_nth1(1, [_|T], Val, [Val|T]) :- !.
 replace_nth1(I, [H|T], Val, [H|NT]) :-
     I > 1, I1 is I-1,
     replace_nth1(I1, T, Val, NT).
@@ -119,15 +117,28 @@ col_available(Board, Col) :-
     Col >= 1, Col =< Cols,
     get_cell(Board, 1, Col, e).
 
-% available_cols(++Board,--Cols)
+% available_cols(++Board,--Sorted)
 % Returns columns sorted center-first for better alpha-beta cutoffs.
 % Multimodality:
 %   available_cols(++,--) - enumerate legal moves, center-first order
 available_cols(Board, Sorted) :-
     Board = board(_,MaxC,_,_,_),
     Mid is (MaxC + 1) // 2,
-    findall(C, (between(1,MaxC,C), col_available(Board,C)), Cols),
+    collect_avail(Board, 1, MaxC, Cols),
     sort_center(Cols, Mid, Sorted).
+
+% collect_avail(++Board,++C,++MaxC,--Cols)
+% Multimodality:
+%   collect_avail(++,++,++,--) - collect available columns without findall
+collect_avail(_, C, MaxC, []) :- C > MaxC, !.
+collect_avail(Board, C, MaxC, Result) :-
+    C1 is C + 1,
+    ( get_cell(Board, 1, C, e) ->
+        Result = [C|Rest],
+        collect_avail(Board, C1, MaxC, Rest)
+    ;
+        collect_avail(Board, C1, MaxC, Result)
+    ).
 
 % sort_center(++Cols,++Mid,--Sorted)
 % Sort columns by distance to center using insertion sort (avoids msort).
