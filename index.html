@@ -175,9 +175,13 @@ function query(q) {
       success: () => G.session.answer({
         success: ans => resolve(ans),
         fail:    ()  => resolve(null),
-        error:   e   => reject(new Error(pl.format_answer(e))),
+        error:   e   => {
+          const msg = (typeof pl !== 'undefined' && pl.format_answer)
+            ? pl.format_answer(e) : String(e);
+          reject(new Error('answer: ' + msg));
+        },
       }),
-      error: e => reject(new Error(String(e))),
+      error: e => reject(new Error('query: ' + String(e))),
     });
   });
 }
@@ -217,7 +221,12 @@ async function initProlog() {
   const src = await resp.text();
 
   setDetail('Компіляція...');
-  await new Promise((res, rej) => G.session.consult(src, {success:res, error:rej}));
+  await new Promise((res, rej) =>
+    G.session.consult(src, {
+      success: res,
+      error: e => rej(new Error('consult: ' + String(e))),
+    })
+  );
   setDetail('Готово!');
 }
 
@@ -444,9 +453,10 @@ document.getElementById('btn-surrender').addEventListener('click', surrender);
     document.getElementById('overlay').classList.add('hidden');
     await newGame();
   } catch(e) {
-    setDetail('ПОМИЛКА: ' + e.message);
+    const msg = (e && e.message) ? e.message : String(e);
+    setDetail('ПОМИЛКА: ' + msg);
     document.getElementById('load-detail').style.color = '#f87171';
-    console.error(e);
+    console.error('Bootstrap error:', e);
   }
 })();
 </script>
