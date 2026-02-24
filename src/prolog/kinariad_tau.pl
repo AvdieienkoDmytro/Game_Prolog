@@ -1,98 +1,114 @@
 % kinariad_tau.pl - K in a row (gravity), Tau-Prolog 0.3.4
 % Author: Avdieienko Dmytro Maksymovych
 %
-% STATELESS design: board passed as an atom (flat string of Rows*Cols chars).
+% STATELESS design: board passed as atom (flat string Rows*Cols chars).
 % Cell chars: e=empty, x=player X, o=player O, b=blocked.
 % All board state is kept in JS; Prolog only computes AI moves.
 %
-% JS encodes board as atom like 'eeeeeee...', 1-based index = (R-1)*Cols+C.
-% Prolog converts atom <-> char list for internal use.
-
-:- dynamic(current_board/1).
-current_board(none).
+% Internally board is stored as list of rows (list of char lists)
+% for O(R+C) cell access instead of O(R*C).
 
 % ============================================================
-% atom <-> char list conversion (Tau-Prolog has atom_chars/2)
+% atom <-> row-list conversion
 % ============================================================
 
-% board_to_list(++BoardAtom,--CharList)
-board_to_list(Atom, List) :- atom_chars(Atom, List).
+% atom_to_board(++Atom,++Cols,--RowList)
+atom_to_board(Atom, Cols, RowList) :-
+    atom_chars(Atom, Flat),
+    split_rows(Flat, Cols, RowList).
 
-% list_to_board(++CharList,--BoardAtom)
-list_to_board(List, Atom) :- atom_chars(Atom, List).
+% board_to_atom(++RowList,--Atom)
+board_to_atom(RowList, Atom) :-
+    flatten_rows(RowList, Flat),
+    atom_chars(Atom, Flat).
 
-% ============================================================
-% Cell access on char list (flat, 1-based index)
-% ============================================================
+split_rows([], _, []) :- !.
+split_rows(Flat, Cols, [Row|Rest]) :-
+    take(Flat, Cols, Row, Tail),
+    split_rows(Tail, Cols, Rest).
 
-% cell_idx(++R,++C,++Cols,--Idx) - 1-based flat index
-cell_idx(R, C, Cols, Idx) :- Idx is (R-1)*Cols + C.
+take(L, 0, [], L) :- !.
+take([H|T], N, [H|R], Tail) :- N > 0, N1 is N-1, take(T, N1, R, Tail).
 
-% list_nth1(++N,++List,--Elem)
-list_nth1(1, [H|_], H) :- !.
-list_nth1(N, [_|T], H) :- N > 1, N1 is N-1, list_nth1(N1, T, H).
+flatten_rows([], []).
+flatten_rows([Row|Rs], Flat) :-
+    flatten_rows(Rs, Rest),
+    concat_row(Row, Rest, Flat).
 
-% list_set_nth1(++N,++List,++Val,--NewList)
-list_set_nth1(1, [_|T], V, [V|T]) :- !.
-list_set_nth1(N, [H|T], V, [H|NT]) :-
-    N > 1, N1 is N-1, list_set_nth1(N1, T, V, NT).
-
-% get_cell(++Cells,++R,++C,++Cols,--Val)
-get_cell(Cells, R, C, Cols, Val) :-
-    cell_idx(R, C, Cols, Idx),
-    list_nth1(Idx, Cells, Val).
-
-% set_cell(++Cells,++R,++C,++Cols,++Val,--NewCells)
-set_cell(Cells, R, C, Cols, Val, NC) :-
-    cell_idx(R, C, Cols, Idx),
-    list_set_nth1(Idx, Cells, Val, NC).
+concat_row([], L, L).
+concat_row([H|T], L, [H|R]) :- concat_row(T, L, R).
 
 % ============================================================
-% Board struct: b(Rows,Cols,K,Cells)  where Cells = char list
+% Cell access on row-list: O(R + C)
 % ============================================================
+
+% get_cell_rl(++RowList,++R,++C,--Val)  1-based
+get_cell_rl(RowList, R, C, Val) :-
+    row_nth1(R, RowList, Row),
+    col_nth1(C, Row, Val).
+
+row_nth1(1, [R|_], R) :- !.
+row_nth1(N, [_|T], R) :- N > 1, N1 is N-1, row_nth1(N1, T, R).
+
+col_nth1(1, [V|_], V) :- !.
+col_nth1(N, [_|T], V) :- N > 1, N1 is N-1, col_nth1(N1, T, V).
+
+% set_cell_rl(++RowList,++R,++C,++Val,--NewRowList)
+set_cell_rl(RowList, R, C, Val, NRL) :-
+    set_row(RowList, R, C, Val, NRL).
+
+set_row([Row|Rs], 1, C, Val, [NRow|Rs]) :- !,
+    set_col(Row, C, Val, NRow).
+set_row([Row|Rs], R, C, Val, [Row|NRs]) :-
+    R > 1, R1 is R-1, set_row(Rs, R1, C, Val, NRs).
+
+set_col([_|T], 1, Val, [Val|T]) :- !.
+set_col([H|T], C, Val, [H|NT]) :- C > 1, C1 is C-1, set_col(T, C1, Val, NT).
 
 % ============================================================
 % Gravity
 % ============================================================
 
-% find_bottom(++Cells,++Rows,++Cols,++Col,--Row)
-find_bottom(Cells, Rows, Cols, Col, Row) :-
-    find_bottom_(Cells, Rows, Cols, Col, Rows, Row).
+opponent(x, o).
+opponent(o, x).
 
-find_bottom_(Cells, _Rows, Cols, Col, CurR, Row) :-
+% find_bottom_rl(++RowList,++Rows,++Col,--Row)
+find_bottom_rl(RowList, Rows, Col, Row) :-
+    find_bot(RowList, Rows, Col, Rows, Row).
+
+find_bot(RowList, _, Col, CurR, Row) :-
     CurR >= 1,
-    get_cell(Cells, CurR, Col, Cols, Val),
+    get_cell_rl(RowList, CurR, Col, Val),
     ( Val = e ->
         Row = CurR
     ;
         CurR1 is CurR - 1,
-        find_bottom_(Cells, _Rows, Cols, Col, CurR1, Row)
+        find_bot(RowList, _, Col, CurR1, Row)
     ).
 
-% drop_piece(++Cells,++Rows,++Cols,++Col,++Player,--NewCells,--Row)
-drop_piece(Cells, Rows, Cols, Col, Player, NewCells, Row) :-
-    find_bottom(Cells, Rows, Cols, Col, Row),
-    set_cell(Cells, Row, Col, Cols, Player, NewCells).
+% drop_piece_rl(++RL,++Rows,++Col,++Player,--NewRL,--Row)
+drop_piece_rl(RL, Rows, Col, Player, NewRL, Row) :-
+    find_bottom_rl(RL, Rows, Col, Row),
+    set_cell_rl(RL, Row, Col, Player, NewRL).
 
-% col_available(++Cells,++Cols,++Col)
-col_available(Cells, Cols, Col) :-
-    Col >= 1, Col =< Cols,
-    get_cell(Cells, 1, Col, Cols, e).
+% col_available_rl(++RL,++Col)  - top row (row 1) must be e
+col_available_rl(RL, Col) :-
+    get_cell_rl(RL, 1, Col, e).
 
-% available_cols(++Cells,++Rows,++Cols,--AvailSorted)
-available_cols(Cells, _Rows, Cols, Sorted) :-
+% available_cols_rl(++RL,++Cols,--SortedCols)
+available_cols_rl(RL, Cols, Sorted) :-
     Mid is (Cols + 1) // 2,
-    collect_avail(Cells, Cols, 1, Cols, Avail),
+    [TopRow|_] = RL,
+    collect_top(TopRow, 1, Avail),
     sort_center(Avail, Mid, Sorted).
 
-collect_avail(_, _, C, MaxC, []) :- C > MaxC, !.
-collect_avail(Cells, Cols, C, MaxC, Result) :-
+collect_top([], _, []).
+collect_top([V|T], C, Result) :-
     C1 is C + 1,
-    ( get_cell(Cells, 1, C, Cols, e) ->
-        Result = [C|Rest],
-        collect_avail(Cells, Cols, C1, MaxC, Rest)
+    ( V = e ->
+        Result = [C|Rest], collect_top(T, C1, Rest)
     ;
-        collect_avail(Cells, Cols, C1, MaxC, Result)
+        collect_top(T, C1, Result)
     ).
 
 sort_center([], _, []).
@@ -111,46 +127,48 @@ insert_by_dist(C, DC, [H|T], Mid, [H|Rest]) :-
 % Win detection
 % ============================================================
 
-opponent(x, o).
-opponent(o, x).
-
-% winner(++Cells,++Rows,++Cols,++K,++R,++C,++Player)
-winner(Cells, Rows, Cols, K, R, C, Player) :-
-    get_cell(Cells, R, C, Cols, Player),
+% winner_rl(++RL,++Rows,++Cols,++K,++R,++C,++Player)
+winner_rl(RL, Rows, Cols, K, R, C, Player) :-
+    get_cell_rl(RL, R, C, Player),
     Player \= e, Player \= b,
-    ( check_dir(Cells, Rows, Cols, K, R, C, Player, 0, 1)
-    ; check_dir(Cells, Rows, Cols, K, R, C, Player, 1, 0)
-    ; check_dir(Cells, Rows, Cols, K, R, C, Player, 1, 1)
-    ; check_dir(Cells, Rows, Cols, K, R, C, Player, 1, -1)
+    ( check_dir_rl(RL, Rows, Cols, K, R, C, Player, 0, 1)
+    ; check_dir_rl(RL, Rows, Cols, K, R, C, Player, 1, 0)
+    ; check_dir_rl(RL, Rows, Cols, K, R, C, Player, 1, 1)
+    ; check_dir_rl(RL, Rows, Cols, K, R, C, Player, 1, -1)
     ).
 
-check_dir(Cells, Rows, Cols, K, R, C, Player, DR, DC) :-
-    count_dir(Cells, Rows, Cols, R, C, Player, DR, DC, 0, N1),
+check_dir_rl(RL, Rows, Cols, K, R, C, Player, DR, DC) :-
+    count_dir_rl(RL, Rows, Cols, R, C, Player, DR, DC, 0, N1),
     NDR is -DR, NDC is -DC,
-    count_dir(Cells, Rows, Cols, R, C, Player, NDR, NDC, 0, N2),
+    count_dir_rl(RL, Rows, Cols, R, C, Player, NDR, NDC, 0, N2),
     Total is N1 + N2 - 1,
     Total >= K.
 
-count_dir(Cells, Rows, Cols, R, C, Player, DR, DC, Acc, Count) :-
+count_dir_rl(RL, Rows, Cols, R, C, Player, DR, DC, Acc, Count) :-
     R >= 1, R =< Rows, C >= 1, C =< Cols,
-    get_cell(Cells, R, C, Cols, Player), !,
+    get_cell_rl(RL, R, C, Player), !,
     Acc1 is Acc + 1,
     NR is R+DR, NC is C+DC,
-    count_dir(Cells, Rows, Cols, NR, NC, Player, DR, DC, Acc1, Count).
-count_dir(_, _, _, _, _, _, _, _, Acc, Acc).
+    count_dir_rl(RL, Rows, Cols, NR, NC, Player, DR, DC, Acc1, Count).
+count_dir_rl(_, _, _, _, _, _, _, _, Acc, Acc).
 
 % ============================================================
-% Heuristic evaluation
+% Heuristic evaluation - single pass over top row (fast)
 % ============================================================
 
-% eval_board(++Cells,++Rows,++Cols,++Player,--Score)
-eval_board(Cells, _Rows, Cols, Player, Score) :-
+% eval_board_rl(++RL,++Cols,++Player,--Score)
+eval_board_rl(RL, Cols, Player, Score) :-
     Mid is (Cols + 1) // 2,
     opponent(Player, Opp),
-    score_cells(Cells, Player, Opp, Mid, Cols, 1, 1, 0, Score).
+    score_rows(RL, Player, Opp, Mid, Cols, 0, Score).
 
-score_cells([], _, _, _, _, _, _, Acc, Acc).
-score_cells([V|T], Player, Opp, Mid, Cols, R, C, Acc, Score) :-
+score_rows([], _, _, _, _, Acc, Acc).
+score_rows([Row|Rs], Player, Opp, Mid, Cols, Acc, Score) :-
+    score_row(Row, Player, Opp, Mid, 1, Acc, Acc2),
+    score_rows(Rs, Player, Opp, Mid, Cols, Acc2, Score).
+
+score_row([], _, _, _, _, Acc, Acc).
+score_row([V|T], Player, Opp, Mid, C, Acc, Score) :-
     ( V = Player ->
         W is 3 - min(2, abs(C - Mid)), NAcc is Acc + W
     ; V = Opp ->
@@ -159,72 +177,71 @@ score_cells([V|T], Player, Opp, Mid, Cols, R, C, Acc, Score) :-
         NAcc = Acc
     ),
     C1 is C + 1,
-    ( C1 > Cols -> NC = 1, NR is R + 1 ; NC = C1, NR = R ),
-    score_cells(T, Player, Opp, Mid, Cols, NR, NC, NAcc, Score).
+    score_row(T, Player, Opp, Mid, C1, NAcc, Score).
 
 % ============================================================
-% MinMax + Alpha-Beta (stateless, board = char list)
+% MinMax + Alpha-Beta
 % ============================================================
 
-% minimax(++Cells,++Rows,++Cols,++K,++LR,++LC,++LP,++D,++A,++B,++Player,++IsMax,--Score)
-minimax(Cells, Rows, Cols, K, LR, LC, LP, _, _, _, Player, _, 100000) :-
-    LP \= Player, winner(Cells, Rows, Cols, K, LR, LC, LP), !.
-minimax(Cells, Rows, Cols, K, LR, LC, LP, 0, _, _, Player, _, Score) :-
+% minimax(++RL,++Rows,++Cols,++K,++LR,++LC,++LP,++D,++A,++B,++Player,++IsMax,--Score)
+minimax(RL, Rows, Cols, K, LR, LC, LP, _, _, _, Player, _, 100000) :-
+    LP \= Player, winner_rl(RL, Rows, Cols, K, LR, LC, LP), !.
+minimax(RL, Rows, Cols, K, LR, LC, LP, 0, _, _, Player, _, Score) :-
     !,
-    ( LP = Player, winner(Cells, Rows, Cols, K, LR, LC, LP) ->
+    ( LP = Player, winner_rl(RL, Rows, Cols, K, LR, LC, LP) ->
         Score = 100000
     ;
-        eval_board(Cells, Rows, Cols, Player, Score)
+        eval_board_rl(RL, Cols, Player, Score)
     ).
-minimax(Cells, Rows, Cols, K, _, _, _, Depth, Alpha, Beta, Player, IsMax, Score) :-
-    available_cols(Cells, Rows, Cols, Cols_),
+minimax(RL, Rows, Cols, K, _, _, _, Depth, Alpha, Beta, Player, IsMax, Score) :-
+    available_cols_rl(RL, Cols, Cols_),
     ( Cols_ = [] ->
-        eval_board(Cells, Rows, Cols, Player, Score)
+        eval_board_rl(RL, Cols, Player, Score)
     ;
         opponent(Player, NextP),
         D1 is Depth - 1,
         ( IsMax = true ->
-            expand_max(Cells, Rows, Cols, K, D1, Alpha, Beta, Player, NextP, Cols_, Alpha, Score)
+            expand_max(RL, Rows, Cols, K, D1, Alpha, Beta, Player, NextP, Cols_, Alpha, Score)
         ;
-            expand_min(Cells, Rows, Cols, K, D1, Alpha, Beta, Player, NextP, Cols_, Beta, Score)
+            expand_min(RL, Rows, Cols, K, D1, Alpha, Beta, Player, NextP, Cols_, Beta, Score)
         )
     ).
 
 expand_max(_, _, _, _, _, _, _, _, _, [], CurA, CurA).
-expand_max(Cells, Rows, Cols, K, D, Alpha, Beta, Player, NextP, [C|Rest], CurA, Best) :-
-    drop_piece(Cells, Rows, Cols, C, Player, NC, Row),
-    minimax(NC, Rows, Cols, K, Row, C, Player, D, CurA, Beta, NextP, false, CS),
+expand_max(RL, Rows, Cols, K, D, Alpha, Beta, Player, NextP, [C|Rest], CurA, Best) :-
+    drop_piece_rl(RL, Rows, C, Player, NRL, Row),
+    minimax(NRL, Rows, Cols, K, Row, C, Player, D, CurA, Beta, NextP, false, CS),
     NewA is max(CurA, CS),
     ( NewA >= Beta -> Best = NewA
-    ; expand_max(Cells, Rows, Cols, K, D, Alpha, Beta, Player, NextP, Rest, NewA, Best)
+    ; expand_max(RL, Rows, Cols, K, D, Alpha, Beta, Player, NextP, Rest, NewA, Best)
     ).
 
 expand_min(_, _, _, _, _, _, _, _, _, [], CurB, CurB).
-expand_min(Cells, Rows, Cols, K, D, Alpha, Beta, Player, NextP, [C|Rest], CurB, Best) :-
-    drop_piece(Cells, Rows, Cols, C, Player, NC, Row),
-    minimax(NC, Rows, Cols, K, Row, C, Player, D, Alpha, CurB, NextP, true, CS),
+expand_min(RL, Rows, Cols, K, D, Alpha, Beta, Player, NextP, [C|Rest], CurB, Best) :-
+    drop_piece_rl(RL, Rows, C, Player, NRL, Row),
+    minimax(NRL, Rows, Cols, K, Row, C, Player, D, Alpha, CurB, NextP, true, CS),
     NewB is min(CurB, CS),
     ( NewB =< Alpha -> Best = NewB
-    ; expand_min(Cells, Rows, Cols, K, D, Alpha, Beta, Player, NextP, Rest, NewB, Best)
+    ; expand_min(RL, Rows, Cols, K, D, Alpha, Beta, Player, NextP, Rest, NewB, Best)
     ).
 
-% best_move(++Cells,++Rows,++Cols,++K,++Player,++Depth,--BestCol)
-best_move(Cells, Rows, Cols, K, Player, Depth, BestCol) :-
-    available_cols(Cells, Rows, Cols, [First|RestCols]),
+% best_move(++RL,++Rows,++Cols,++K,++Player,++Depth,--BestCol)
+best_move(RL, Rows, Cols, K, Player, Depth, BestCol) :-
+    available_cols_rl(RL, Cols, [First|RestCols]),
     opponent(Player, NextP),
     D1 is Depth - 1,
-    drop_piece(Cells, Rows, Cols, First, Player, NC0, Row0),
-    minimax(NC0, Rows, Cols, K, Row0, First, Player, D1, -10000000, 10000000, NextP, false, S0),
-    best_move_ab(Cells, Rows, Cols, K, D1, Player, NextP, RestCols, S0, First, BestCol).
+    drop_piece_rl(RL, Rows, First, Player, NRL0, Row0),
+    minimax(NRL0, Rows, Cols, K, Row0, First, Player, D1, -10000000, 10000000, NextP, false, S0),
+    best_move_ab(RL, Rows, Cols, K, D1, Player, NextP, RestCols, S0, First, BestCol).
 
 best_move_ab(_, _, _, _, _, _, _, [], _, BC, BC).
-best_move_ab(Cells, Rows, Cols, K, D, Player, NextP, [C|Rest], CurBS, CurBC, FC) :-
-    drop_piece(Cells, Rows, Cols, C, Player, NC, Row),
-    minimax(NC, Rows, Cols, K, Row, C, Player, D, CurBS, 10000000, NextP, false, CS),
+best_move_ab(RL, Rows, Cols, K, D, Player, NextP, [C|Rest], CurBS, CurBC, FC) :-
+    drop_piece_rl(RL, Rows, C, Player, NRL, Row),
+    minimax(NRL, Rows, Cols, K, Row, C, Player, D, CurBS, 10000000, NextP, false, CS),
     ( CS > CurBS ->
-        best_move_ab(Cells, Rows, Cols, K, D, Player, NextP, Rest, CS, C, FC)
+        best_move_ab(RL, Rows, Cols, K, D, Player, NextP, Rest, CS, C, FC)
     ;
-        best_move_ab(Cells, Rows, Cols, K, D, Player, NextP, Rest, CurBS, CurBC, FC)
+        best_move_ab(RL, Rows, Cols, K, D, Player, NextP, Rest, CurBS, CurBC, FC)
     ).
 
 % ============================================================
@@ -232,20 +249,18 @@ best_move_ab(Cells, Rows, Cols, K, D, Player, NextP, [C|Rest], CurBS, CurBC, FC)
 % ============================================================
 
 % js_ai(++BoardAtom,++Player,++Depth,++Rows,++Cols,++K,--ColOut,--RowOut,--NewBoardAtom,--Result)
-% Multimodality:
-%   js_ai(++,++,++,++,++,++,--,--,--,--) - compute AI move, return new board atom
 js_ai(BoardAtom, Player, Depth, Rows, Cols, K, ColOut, RowOut, NewBoardAtom, Result) :-
-    atom_chars(BoardAtom, Cells),
-    ( available_cols(Cells, Rows, Cols, []) ->
+    atom_to_board(BoardAtom, Cols, RL),
+    ( available_cols_rl(RL, Cols, []) ->
         ColOut = -1, RowOut = -1, NewBoardAtom = BoardAtom, Result = draw
     ;
-        best_move(Cells, Rows, Cols, K, Player, Depth, Col),
-        drop_piece(Cells, Rows, Cols, Col, Player, NewCells, Row),
-        atom_chars(NewBoardAtom, NewCells),
+        best_move(RL, Rows, Cols, K, Player, Depth, Col),
+        drop_piece_rl(RL, Rows, Col, Player, NewRL, Row),
+        board_to_atom(NewRL, NewBoardAtom),
         ColOut = Col, RowOut = Row,
-        ( winner(NewCells, Rows, Cols, K, Row, Col, Player) ->
+        ( winner_rl(NewRL, Rows, Cols, K, Row, Col, Player) ->
             Result = win
-        ; available_cols(NewCells, Rows, Cols, []) ->
+        ; available_cols_rl(NewRL, Cols, []) ->
             Result = draw
         ;
             Result = ok
@@ -253,17 +268,15 @@ js_ai(BoardAtom, Player, Depth, Rows, Cols, K, ColOut, RowOut, NewBoardAtom, Res
     ).
 
 % js_human(++BoardAtom,++Col,++Player,++Rows,++Cols,++K,--RowOut,--NewBoardAtom,--Result)
-% Multimodality:
-%   js_human(++,++,++,++,++,++,--,--,--) - execute human move, return new board atom
 js_human(BoardAtom, Col, Player, Rows, Cols, K, RowOut, NewBoardAtom, Result) :-
-    atom_chars(BoardAtom, Cells),
-    ( col_available(Cells, Cols, Col) ->
-        drop_piece(Cells, Rows, Cols, Col, Player, NewCells, Row),
-        atom_chars(NewBoardAtom, NewCells),
+    atom_to_board(BoardAtom, Cols, RL),
+    ( col_available_rl(RL, Col) ->
+        drop_piece_rl(RL, Rows, Col, Player, NewRL, Row),
+        board_to_atom(NewRL, NewBoardAtom),
         RowOut = Row,
-        ( winner(NewCells, Rows, Cols, K, Row, Col, Player) ->
+        ( winner_rl(NewRL, Rows, Cols, K, Row, Col, Player) ->
             Result = win
-        ; available_cols(NewCells, Rows, Cols, []) ->
+        ; available_cols_rl(NewRL, Cols, []) ->
             Result = draw
         ;
             Result = ok
@@ -272,25 +285,25 @@ js_human(BoardAtom, Col, Player, Rows, Cols, K, RowOut, NewBoardAtom, Result) :-
         RowOut = -1, NewBoardAtom = BoardAtom, Result = full
     ).
 
-% js_new_board(++Rows,++Cols,++ForbAtom,--BoardAtom)
-% ForbAtom: Prolog list of (R,C) pairs as atom string, e.g. '[(3,4),(3,5)]'
-% Multimodality:
-%   js_new_board(++,++,++,--) - create initial board atom
+% js_new_board(++Rows,++Cols,++Forb,--BoardAtom)
+% Forb: Prolog list of (R,C) pairs, e.g. [(3,4),(3,5)]
 js_new_board(Rows, Cols, Forb, BoardAtom) :-
-    Size is Rows * Cols,
-    make_cells(1, 1, Rows, Cols, Size, Forb, Cells),
-    atom_chars(BoardAtom, Cells).
+    make_rowlist(1, Rows, Cols, Forb, RL),
+    board_to_atom(RL, BoardAtom).
 
-% make_cells(++R,++C,++Rows,++Cols,++Rem,++Forb,--Cells)
-make_cells(_, _, _, _, 0, _, []) :- !.
-make_cells(R, C, Rows, Cols, Rem, Forb, [Cell|Rest]) :-
-    Rem > 0,
+make_rowlist(R, Rows, _, _, []) :- R > Rows, !.
+make_rowlist(R, Rows, Cols, Forb, [Row|Rest]) :-
+    R =< Rows,
+    make_row(1, Cols, R, Forb, Row),
+    R1 is R + 1,
+    make_rowlist(R1, Rows, Cols, Forb, Rest).
+
+make_row(C, Cols, _, _, []) :- C > Cols, !.
+make_row(C, Cols, R, Forb, [Cell|Rest]) :-
+    C =< Cols,
     ( list_member((R,C), Forb) -> Cell = b ; Cell = e ),
-    Rem1 is Rem - 1,
     C1 is C + 1,
-    ( C1 > Cols -> NC = 1, NR is R + 1 ; NC = C1, NR = R ),
-    make_cells(NR, NC, Rows, Cols, Rem1, Forb, Rest).
+    make_row(C1, Cols, R, Forb, Rest).
 
-% list_member(++X,++List)
 list_member(X, [X|_]) :- !.
 list_member(X, [_|T]) :- list_member(X, T).
