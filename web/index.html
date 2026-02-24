@@ -463,7 +463,127 @@ async function initProlog() {
 }
 
 // ============================================================
-// Prolog bridge - stateless API
+// JS AI — Minimax + Alpha-Beta (runs in ~ms)
+// ============================================================
+
+// board string helpers
+function boardGet(board, cols, r, c) { return board[(r-1)*cols + (c-1)]; }
+function boardSet(board, cols, r, c, v) {
+  const i = (r-1)*cols + (c-1);
+  return board.slice(0, i) + v + board.slice(i+1);
+}
+
+function jsFindBottom(board, rows, cols, col) {
+  for (let r = rows; r >= 1; r--) {
+    const v = boardGet(board, cols, r, col);
+    if (v === 'e') return r;
+    if (v === 'b') continue;
+  }
+  return -1;
+}
+
+function jsDropPiece(board, rows, cols, col, player) {
+  const row = jsFindBottom(board, rows, cols, col);
+  if (row < 0) return null;
+  return { board: boardSet(board, cols, row, col, player), row };
+}
+
+function jsAvailCols(board, cols) {
+  const mid = Math.floor((cols + 1) / 2);
+  const avail = [];
+  for (let c = 1; c <= cols; c++) {
+    if (boardGet(board, cols, 1, c) === 'e') avail.push(c);
+  }
+  avail.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid));
+  return avail;
+}
+
+function jsCheckWin(board, rows, cols, k, r, c, player) {
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    let cnt = 1;
+    for (let d = 1; d < k; d++) {
+      const nr = r+dr*d, nc = c+dc*d;
+      if (nr<1||nr>rows||nc<1||nc>cols) break;
+      if (boardGet(board,cols,nr,nc) !== player) break;
+      cnt++;
+    }
+    for (let d = 1; d < k; d++) {
+      const nr = r-dr*d, nc = c-dc*d;
+      if (nr<1||nr>rows||nc<1||nc>cols) break;
+      if (boardGet(board,cols,nr,nc) !== player) break;
+      cnt++;
+    }
+    if (cnt >= k) return true;
+  }
+  return false;
+}
+
+function jsEval(board, rows, cols, player) {
+  const opp = player === 'x' ? 'o' : 'x';
+  const mid = Math.floor((cols + 1) / 2);
+  let score = 0;
+  for (let r = 1; r <= rows; r++) {
+    for (let c = 1; c <= cols; c++) {
+      const v = boardGet(board, cols, r, c);
+      const w = 3 - Math.min(2, Math.abs(c - mid));
+      if (v === player) score += w;
+      else if (v === opp) score -= w;
+    }
+  }
+  return score;
+}
+
+function jsMinimax(board, rows, cols, k, lastR, lastC, lastP, depth, alpha, beta, player, isMax) {
+  const opp = player === 'x' ? 'o' : 'x';
+  if (lastP !== player && jsCheckWin(board, rows, cols, k, lastR, lastC, lastP))
+    return 100000;
+  if (depth === 0) {
+    if (lastP === player && jsCheckWin(board, rows, cols, k, lastR, lastC, lastP))
+      return 100000;
+    return jsEval(board, rows, cols, player);
+  }
+  const moves = jsAvailCols(board, cols);
+  if (moves.length === 0) return jsEval(board, rows, cols, player);
+
+  if (isMax) {
+    let best = alpha;
+    for (const c of moves) {
+      const res = jsDropPiece(board, rows, cols, c, player);
+      if (!res) continue;
+      const sc = jsMinimax(res.board, rows, cols, k, res.row, c, player, depth-1, best, beta, opp, false);
+      if (sc > best) best = sc;
+      if (best >= beta) break;
+    }
+    return best;
+  } else {
+    let best = beta;
+    for (const c of moves) {
+      const res = jsDropPiece(board, rows, cols, c, player);
+      if (!res) continue;
+      const sc = jsMinimax(res.board, rows, cols, k, res.row, c, player, depth-1, alpha, best, opp, true);
+      if (sc < best) best = sc;
+      if (best <= alpha) break;
+    }
+    return best;
+  }
+}
+
+function jsBestMove(board, rows, cols, k, player, depth) {
+  const opp = player === 'x' ? 'o' : 'x';
+  const moves = jsAvailCols(board, cols);
+  let bestCol = moves[0], bestScore = -Infinity;
+  for (const c of moves) {
+    const res = jsDropPiece(board, rows, cols, c, player);
+    if (!res) continue;
+    const sc = jsMinimax(res.board, rows, cols, k, res.row, c, player, depth-1, bestScore, Infinity, opp, false);
+    if (sc > bestScore) { bestScore = sc; bestCol = c; }
+  }
+  return bestCol;
+}
+
+// ============================================================
+// Prolog bridge - stateless API (human move + board init only)
 // ============================================================
 
 function parseForbidden(text) {
@@ -540,40 +660,43 @@ async function humanClickCol(col) {
   }
 }
 
-async function doAiMove() {
+function doAiMove() {
   if (state.gameOver) return;
   state.aiThinking = true;
   setStatus('ai', `ШІ (${state.currentPlayer.toUpperCase()}) думає...`);
   disableArrows(true);
 
   const player = state.currentPlayer;
-  await new Promise(r => setTimeout(r, 50));
+  const { board, rows, cols, k, depth } = state;
 
-  try {
-    const ans = await prologQuery(
-      `js_ai('${state.board}',${player},${state.depth},${state.rows},${state.cols},${state.k},ColOut,RowOut,NewBoard,Result)`
-    );
-    if (!ans) { setStatus('error', 'ШІ не знайшов хід'); return; }
+  setTimeout(() => {
+    try {
+      const col = jsBestMove(board, rows, cols, k, player, depth);
+      const res = jsDropPiece(board, rows, cols, col, player);
+      if (!res) { setStatus('error', 'ШІ не знайшов хід'); return; }
 
-    const result = ans.lookup('Result').toString();
-    const col    = parseInt(ans.lookup('ColOut').toString());
-    const row    = parseInt(ans.lookup('RowOut').toString());
+      const { board: newBoard, row } = res;
+      let result;
+      if (jsCheckWin(newBoard, rows, cols, k, row, col, player)) result = 'win';
+      else if (jsAvailCols(newBoard, cols).length === 0) result = 'draw';
+      else result = 'ok';
 
-    state.board = ans.lookup('NewBoard').toString();
-    logMsg(player, `${player.toUpperCase()} (ШІ) → стовпець ${col} (рядок ${row})`);
-    renderBoard();
-    animateLastDrop(row - 1, col - 1);
-    await handleResult(result, player);
-  } catch(e) {
-    setStatus('error', 'Помилка ШІ: ' + e);
-    console.error(e);
-  } finally {
-    state.aiThinking = false;
-    if (!state.gameOver) disableArrows(false);
-  }
+      state.board = newBoard;
+      logMsg(player, `${player.toUpperCase()} (ШІ) → стовпець ${col} (рядок ${row})`);
+      renderBoard();
+      animateLastDrop(row - 1, col - 1);
+      handleResult(result, player);
+    } catch(e) {
+      setStatus('error', 'Помилка ШІ: ' + e);
+      console.error(e);
+    } finally {
+      state.aiThinking = false;
+      if (!state.gameOver) disableArrows(false);
+    }
+  }, 20);
 }
 
-async function handleResult(result, player) {
+function handleResult(result, player) {
   if (result === 'win') {
     state.gameOver = true;
     state.scores[player]++;
@@ -674,7 +797,7 @@ function updateStatusText() {
   const isAi = shouldAiMove();
   const who = currentPlayer.toUpperCase();
   if (isAi) {
-    setStatus('ai', `Хід ${who} — ШІ (Prolog)`);
+    setStatus('ai', `Хід ${who} — ШІ`);
   } else {
     setStatus('wait', `Хід ${who} — натисни \u25BC над стовпцем`);
   }
