@@ -200,23 +200,21 @@ function val(ans, v) {
   return pl.format_answer({links:{X:t}}).replace('X = ','').trim();
 }
 
-// Convert Tau-Prolog list term (possibly nested list-of-lists) to flat JS array
+// Convert Tau-Prolog list term (possibly list-of-lists) to flat JS array
 function termListToArray(t) {
   const arr = [];
-  function walk(node) {
-    if (!node) return;
-    if (node.id === '.' && node.args) {
+  function flatWalk(node) {
+    while (node && node.id === '.' && node.args) {
       const head = node.args[0];
-      if (head.id === '.' || (head.id === '[]')) {
-        // head is itself a list (row) - recurse into it
-        walk(head);
+      if (head.id === '.' && head.args) {
+        flatWalk(head); // head is a sub-list (row)
       } else {
         arr.push(head.id !== undefined ? String(head.id) : String(head.value));
       }
-      walk(node.args[1]);
+      node = node.args[1];
     }
   }
-  walk(t);
+  flatWalk(t);
   return arr;
 }
 

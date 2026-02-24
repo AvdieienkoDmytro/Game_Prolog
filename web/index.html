@@ -539,19 +539,20 @@ async function fetchAndRender() {
 // Parse Tau-Prolog list term (possibly list-of-lists) to flat JS array of strings
 function parsePrologListTerm(term) {
   const result = [];
-  function walk(node) {
-    if (!node || node.indicator === '[]/0') return;
-    if (node.indicator === './2') {
+  // flatWalk: iterate a Prolog list, push atoms, recurse into sub-lists
+  function flatWalk(node) {
+    while (node && node.indicator === './2') {
       const head = node.args[0];
       if (head.indicator === './2' || head.indicator === '[]/0') {
-        walk(head);
+        // head is a sub-list (a row) - flatten it too
+        flatWalk(head);
       } else {
         result.push(head.toString());
       }
-      walk(node.args[1]);
+      node = node.args[1];
     }
   }
-  walk(term);
+  flatWalk(term);
   return result;
 }
 
