@@ -6,6 +6,8 @@
 % current_board/1 is declared as a static fact here so retractall works.
 % JS must call assertz(current_board(none)) once after consult to register it.
 
+:- use_module(library(lists)).
+
 % Sentinel - makes current_board/1 known to the DB so retractall won't throw.
 % JS init code replaces this immediately via retractall+assertz.
 current_board(none).
@@ -17,13 +19,20 @@ current_board(none).
 % Board construction
 % ============================================================
 
+% make_list(++N,--List) - create a list of N uninstantiated variables
+% Replaces length/2 which requires lists module in Tau-Prolog.
+% Multimodality:
+%   make_list(++,--) - create list of length N
+make_list(0, []) :- !.
+make_list(N, [_|T]) :- N > 0, N1 is N-1, make_list(N1, T).
+
 % new_game(++Rows,++Cols,++K,++Forb,--Board)
 % Multimodality:
 %   new_game(++,++,++,++,--) - create board (main use)
 %   new_game(++,++,++,++,+)  - verify board parameters
 new_game(Rows, Cols, K, Forb, board(Rows,Cols,K,Forb,Cells)) :-
     Size is Rows * Cols,
-    length(Cells, Size),
+    make_list(Size, Cells),
     init_cells(Cells, Rows, Cols, Forb, 1, 1).
 
 % init_cells(++Cells,++Rows,++Cols,++Forb,++CR,++CC)
