@@ -396,24 +396,9 @@ js_ai(Player, Depth, ColOut, RowOut, Result) :-
         )
     ).
 
-% js_get_board(--Rows,--Cols,--K,--FlatCells)
-% Returns cells as flat list for JS renderer.
+% js_get_board(--Rows,--Cols,--K,--RowList)
+% Returns list of rows; JS renderer flattens it.
 % Multimodality:
 %   js_get_board(--,--,--,--) - read board for rendering
-js_get_board(Rows, Cols, K, FlatCells) :-
-    current_board(board(Rows,Cols,K,_,RowList)),
-    flatten_rows(RowList, FlatCells).
-
-% flatten_rows(++RowList,--FlatList)
-% Multimodality:
-%   flatten_rows(++,--) - flatten list of rows to single list
-flatten_rows([], []).
-flatten_rows([Row|Rest], Flat) :-
-    flatten_rows(Rest, FlatRest),
-    append_lists(Row, FlatRest, Flat).
-
-% append_lists(++L1,++L2,--L3)
-% Multimodality:
-%   append_lists(++,++,--) - concatenate two lists
-append_lists([], L, L).
-append_lists([H|T], L, [H|R]) :- append_lists(T, L, R).
+js_get_board(Rows, Cols, K, RowList) :-
+    current_board(board(Rows,Cols,K,_,RowList)).

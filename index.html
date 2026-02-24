@@ -200,14 +200,23 @@ function val(ans, v) {
   return pl.format_answer({links:{X:t}}).replace('X = ','').trim();
 }
 
-// Convert Tau-Prolog list term to JS array of atom strings
+// Convert Tau-Prolog list term (possibly nested list-of-lists) to flat JS array
 function termListToArray(t) {
   const arr = [];
-  while (t && t.id === '.' && t.args) {
-    const head = t.args[0];
-    arr.push(head.id !== undefined ? String(head.id) : String(head.value));
-    t = t.args[1];
+  function walk(node) {
+    if (!node) return;
+    if (node.id === '.' && node.args) {
+      const head = node.args[0];
+      if (head.id === '.' || (head.id === '[]')) {
+        // head is itself a list (row) - recurse into it
+        walk(head);
+      } else {
+        arr.push(head.id !== undefined ? String(head.id) : String(head.value));
+      }
+      walk(node.args[1]);
+    }
   }
+  walk(t);
   return arr;
 }
 

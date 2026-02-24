@@ -536,14 +536,22 @@ async function fetchAndRender() {
   renderBoardFromCache();
 }
 
-// Parse Tau-Prolog list term to JS array of strings
+// Parse Tau-Prolog list term (possibly list-of-lists) to flat JS array of strings
 function parsePrologListTerm(term) {
   const result = [];
-  let cur = term;
-  while (cur && cur.indicator === './2') {
-    result.push(cur.args[0].toString());
-    cur = cur.args[1];
+  function walk(node) {
+    if (!node || node.indicator === '[]/0') return;
+    if (node.indicator === './2') {
+      const head = node.args[0];
+      if (head.indicator === './2' || head.indicator === '[]/0') {
+        walk(head);
+      } else {
+        result.push(head.toString());
+      }
+      walk(node.args[1]);
+    }
   }
+  walk(term);
   return result;
 }
 
