@@ -277,127 +277,40 @@ async function humanClick(col) {
   }
 }
 
-// ── JS AI — Minimax + Alpha-Beta ───────────────────────────
-function bGet(b,cols,r,c){return b[(r-1)*cols+(c-1)];}
-function bSet(b,cols,r,c,v){const i=(r-1)*cols+(c-1);return b.slice(0,i)+v+b.slice(i+1);}
+// ── SWI-Prolog AI server URL ────────────────────────────────
+// Після деплою на Render.com замініть на вашу URL:
+const AI_URL = 'https://game-prolog.onrender.com';
 
-function aiFindBottom(b,rows,cols,col){
-  for(let r=rows;r>=1;r--){
-    const v=bGet(b,cols,r,col);
-    if(v==='e')return r;
-    if(v==='b')continue;
-  }
-  return -1;
-}
-
-function aiDrop(b,rows,cols,col,player){
-  const row=aiFindBottom(b,rows,cols,col);
-  if(row<0)return null;
-  return{board:bSet(b,cols,row,col,player),row};
-}
-
-function aiMoves(b,cols){
-  const mid=Math.floor((cols+1)/2);
-  const av=[];
-  for(let c=1;c<=cols;c++)if(bGet(b,cols,1,c)==='e')av.push(c);
-  av.sort((a,b)=>Math.abs(a-mid)-Math.abs(b-mid));
-  return av;
-}
-
-function aiWin(b,rows,cols,k,r,c,p){
-  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
-  for(const[dr,dc]of dirs){
-    let n=1;
-    for(let d=1;d<k;d++){const nr=r+dr*d,nc=c+dc*d;if(nr<1||nr>rows||nc<1||nc>cols||bGet(b,cols,nr,nc)!==p)break;n++;}
-    for(let d=1;d<k;d++){const nr=r-dr*d,nc=c-dc*d;if(nr<1||nr>rows||nc<1||nc>cols||bGet(b,cols,nr,nc)!==p)break;n++;}
-    if(n>=k)return true;
-  }
-  return false;
-}
-
-function aiEval(b,rows,cols,p){
-  const opp=p==='x'?'o':'x';
-  const mid=Math.floor((cols+1)/2);
-  let s=0;
-  for(let r=1;r<=rows;r++)for(let c=1;c<=cols;c++){
-    const v=bGet(b,cols,r,c);
-    const w=3-Math.min(2,Math.abs(c-mid));
-    if(v===p)s+=w;else if(v===opp)s-=w;
-  }
-  return s;
-}
-
-function aiMM(b,rows,cols,k,lr,lc,lp,d,alpha,beta,p,isMax){
-  const opp=p==='x'?'o':'x';
-  if(lp!==p&&aiWin(b,rows,cols,k,lr,lc,lp))return 100000;
-  if(d===0){
-    if(lp===p&&aiWin(b,rows,cols,k,lr,lc,lp))return 100000;
-    return aiEval(b,rows,cols,p);
-  }
-  const mv=aiMoves(b,cols);
-  if(!mv.length)return aiEval(b,rows,cols,p);
-  if(isMax){
-    let best=alpha;
-    for(const c of mv){
-      const r=aiDrop(b,rows,cols,c,p);if(!r)continue;
-      const s=aiMM(r.board,rows,cols,k,r.row,c,p,d-1,best,beta,opp,false);
-      if(s>best)best=s;if(best>=beta)break;
-    }
-    return best;
-  }else{
-    let best=beta;
-    for(const c of mv){
-      const r=aiDrop(b,rows,cols,c,p);if(!r)continue;
-      const s=aiMM(r.board,rows,cols,k,r.row,c,p,d-1,alpha,best,opp,true);
-      if(s<best)best=s;if(best<=alpha)break;
-    }
-    return best;
-  }
-}
-
-function aiBest(b,rows,cols,k,p,depth){
-  const opp=p==='x'?'o':'x';
-  const mv=aiMoves(b,cols);
-  let bestCol=mv[0],bestScore=-Infinity;
-  for(const c of mv){
-    const r=aiDrop(b,rows,cols,c,p);if(!r)continue;
-    const s=aiMM(r.board,rows,cols,k,r.row,c,p,depth-1,bestScore,Infinity,opp,false);
-    if(s>bestScore){bestScore=s;bestCol=c;}
-  }
-  return bestCol;
-}
-
-function doAI() {
+async function doAI() {
   if (G.gameOver) return;
   G.busy = true;
   disableArrows(true);
-  setStatus('ai', `ШІ (${G.currentPlayer.toUpperCase()}) думає...`);
+  setStatus('ai', `ШІ (${G.currentPlayer.toUpperCase()}) думає (SWI-Prolog)...`);
 
-  const p=G.currentPlayer;
-  const{board:b,rows,cols,k,depth}=G;
+  const p = G.currentPlayer;
+  const { board, rows, cols, k, depth } = G;
 
-  setTimeout(()=>{
-    try{
-      const col=aiBest(b,rows,cols,k,p,depth);
-      const res=aiDrop(b,rows,cols,col,p);
-      if(!res){setStatus('error','ШІ не знайшов хід');return;}
-      const{board:nb,row}=res;
-      let result;
-      if(aiWin(nb,rows,cols,k,row,col,p))result='win';
-      else if(!aiMoves(nb,cols).length)result='draw';
-      else result='ok';
-      G.board=nb;
-      logMsg(p,`${p.toUpperCase()} (ШІ) -> стовпець ${col}`);
-      renderBoard();
-      handleResult(result);
-    }catch(e){
-      setStatus('error','Помилка ШІ: '+e.message);
-      console.error(e);
-    }finally{
-      G.busy=false;
-      if(!G.gameOver)disableArrows(isAI());
-    }
-  },20);
+  try {
+    const resp = await fetch(AI_URL + '/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board, player: p, depth, rows, cols, k }),
+    });
+    if (!resp.ok) throw new Error('Сервер: HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    G.board = data.board;
+    logMsg(p, `${p.toUpperCase()} (ШІ) -> стовпець ${data.col} (рядок ${data.row})`);
+    renderBoard();
+    handleResult(data.result);
+  } catch(e) {
+    setStatus('error', 'Помилка ШІ: ' + e.message);
+    console.error(e);
+  } finally {
+    G.busy = false;
+    if (!G.gameOver) disableArrows(isAI());
+  }
 }
 
 // ── Handle result ──────────────────────────────────────────
