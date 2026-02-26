@@ -18,21 +18,18 @@
 
 :- set_setting(http:cors, [*]).
 
-:- http_handler(root(ai),     handle_ai,     [method(post)]).
-:- http_handler(root(ai),     cors_preflight,[method(options)]).
-:- http_handler(root(health), handle_health, [method(get)]).
-:- http_handler(root(health), cors_preflight,[method(options)]).
+:- http_handler(root(ai),     handle_ai,     []).
+:- http_handler(root(health), handle_health, []).
 
 % ============================================================
 % HTTP handlers
 % ============================================================
 
-cors_preflight(Request) :-
-    cors_enable(Request, [methods([post, get, options])]),
-    format("Content-type: text/plain~n~n").
-
 handle_ai(Request) :-
     cors_enable(Request, [methods([post, options])]),
+    ( memberchk(method(options), Request) ->
+        format("Content-type: text/plain~n~n")
+    ;
     http_read_json_dict(Request, D, []),
     atom_string(BoardAtom, D.board),
     atom_string(Player,    D.player),
@@ -45,6 +42,7 @@ handle_ai(Request) :-
         atom_string(Result, RS),
         reply_json_dict(json{col:Col, row:Row, board:NBS, result:RS})
     ;   reply_json_dict(json{error:"ai_failed"}, [status(500)])
+    )
     ).
 
 handle_health(Request) :-
