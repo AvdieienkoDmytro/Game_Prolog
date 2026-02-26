@@ -19,8 +19,9 @@
 :- set_setting(http:cors, [*]).
 
 :- http_handler(root(ai),     handle_ai,     [method(post)]).
-:- http_handler(root(health), handle_health, []).
-:- http_handler(root(.),      cors_preflight,[method(options), prefix]).
+:- http_handler(root(ai),     cors_preflight,[method(options)]).
+:- http_handler(root(health), handle_health, [method(get)]).
+:- http_handler(root(health), cors_preflight,[method(options)]).
 
 % ============================================================
 % HTTP handlers
