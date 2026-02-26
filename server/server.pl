@@ -278,4 +278,4 @@ main :-
     format("K-in-a-row SWI-Prolog server starting on port ~w~n", [Port]),
     http_server(http_dispatch, [port(Port)]),
     format("Server ready. Waiting for requests...~n"),
-    sleep(inf).
+    thread_get_message(_).  % block main thread forever
