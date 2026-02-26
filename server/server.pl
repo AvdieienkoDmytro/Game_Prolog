@@ -20,10 +20,15 @@
 
 :- http_handler(root(ai),     handle_ai,     [method(post)]).
 :- http_handler(root(health), handle_health, []).
+:- http_handler(root(.),      cors_preflight,[method(options), prefix]).
 
 % ============================================================
 % HTTP handlers
 % ============================================================
+
+cors_preflight(Request) :-
+    cors_enable(Request, [methods([post, get, options])]),
+    format("Content-type: text/plain~n~n").
 
 handle_ai(Request) :-
     cors_enable(Request, [methods([post, options])]),
