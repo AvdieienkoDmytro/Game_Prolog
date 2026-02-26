@@ -197,18 +197,21 @@ score_row([V|T], P, Opp, Mid, C, Acc, Score) :-
 % Columns sorted center-first for better pruning.
 % ============================================================
 
-minimax(RL, Rows, Cols, K, LR, LC, LP, _, _, _, Player, _, 100000) :-
-    LP \= Player, winner(RL, Rows, Cols, K, LR, LC, LP), !.
-minimax(RL, Rows, Cols, K, LR, LC, LP, 0, _, _, Player, _, Score) :-
+% IsMax=false  →  AI  just moved and won  (+100000 good for AI)
+% IsMax=true   →  Opp just moved and won  (-100000 bad  for AI)
+minimax(RL, Rows, Cols, K, LR, LC, LP, _, _, _, _, false, 100000) :-
+    winner(RL, Rows, Cols, K, LR, LC, LP), !.
+minimax(RL, Rows, Cols, K, LR, LC, LP, _, _, _, _, true, -100000) :-
+    winner(RL, Rows, Cols, K, LR, LC, LP), !.
+minimax(RL, Rows, Cols, K, _, _, _, 0, _, _, Player, IsMax, Score) :-
     !,
-    ( LP = Player, winner(RL, Rows, Cols, K, LR, LC, LP)
-    -> Score = 100000
-    ;  eval_board(RL, Cols, Player, Score)
-    ).
+    eval_board(RL, Cols, Player, S0),
+    ( IsMax = true -> Score = S0 ; Score is -S0 ).
 minimax(RL, Rows, Cols, K, _, _, _, Depth, Alpha, Beta, Player, IsMax, Score) :-
     available_cols(RL, Cols, Cols_),
     ( Cols_ = []
-    -> eval_board(RL, Cols, Player, Score)
+    -> eval_board(RL, Cols, Player, S0),
+       ( IsMax = true -> Score = S0 ; Score is -S0 )
     ;  opponent(Player, NextP), D1 is Depth-1,
        ( IsMax = true
        -> expand_max(RL, Rows, Cols, K, D1, Alpha, Beta, Player, NextP, Cols_, Alpha, Score)
