@@ -1,9 +1,9 @@
 # Game\_Prolog — K в ряд (падіння)
 
-**Автор:** Авдєєнко Дмитро Максимович
-**Курс:** Логічне програмування · SWI-Prolog
-**Демо:** [https://avdieienkodmytro.github.io/Game\_Prolog](https://avdieienkodmytro.github.io/Game_Prolog)
-**Репозиторій:** [https://github.com/AvdieienkoDmytro/Game\_Prolog](https://github.com/AvdieienkoDmytro/Game_Prolog)
+- **Автор:** Авдєєнко Дмитро Максимович
+- **Курс:** Логічне програмування · SWI-Prolog
+- **Демо:** [https://avdieienkodmytro.github.io/Game\_Prolog](https://avdieienkodmytro.github.io/Game_Prolog)
+- **Репозиторій:** [https://github.com/AvdieienkoDmytro/Game\_Prolog](https://github.com/AvdieienkoDmytro/Game_Prolog)
 
 ---
 
